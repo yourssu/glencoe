@@ -14,11 +14,12 @@ def say_hello(message, say):
 
 
 @app.command("/echo")
-def echo_command(ack, respond, command):
+def echo_command(ack, say, command):
     ack()
-    respond(command["text"])
+    say(command["text"])
 
 
 if __name__ == "__main__":
+    print("⚡ Slack Bot is starting...")
     handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     handler.start()
