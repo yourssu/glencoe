@@ -25,7 +25,6 @@ jobs:
             docker run -d \
               --name slackbot \
               --restart always \
-              -p 3000:3000 \
               -e SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }} \
-              -e SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }} \
+              -e SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }} \
               slackbot
