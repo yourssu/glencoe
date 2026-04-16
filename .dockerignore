@@ -1,0 +1,10 @@
+.env
+.venv
+venv
+__pycache__
+.git
+.gitignore
+.dockerignore
+*.pyc
+.DS_Store
+render.yaml
