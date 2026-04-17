@@ -1,4 +1,5 @@
-import anthropic
+from openai import OpenAI
+
 from agent.conversation_store import InMemoryConversationStore
 from agent.prompt_builder import build_system_prompt
 from config import settings
@@ -9,7 +10,10 @@ class Orchestrator:
     def __init__(self, tool_registry: ToolRegistry, conversation_store: InMemoryConversationStore):
         self._registry = tool_registry
         self._store = conversation_store
-        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._client = OpenAI(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
+        )
         self._system_prompt = build_system_prompt()
 
     def process_message(
@@ -27,53 +31,54 @@ class Orchestrator:
         tools = self._registry.get_all_schemas()
 
         for _ in range(settings.max_tool_iterations):
-            response = self._client.messages.create(
-                model=settings.model,
-                max_tokens=4096,
-                system=self._system_prompt,
-                tools=tools if tools else [],
-                messages=messages,
-            )
+            kwargs = {
+                "model": settings.model,
+                "max_tokens": 4096,
+                "messages": [{"role": "system", "content": self._system_prompt}] + messages,
+            }
+            if tools:
+                kwargs["tools"] = tools
 
-            if response.stop_reason == "end_turn":
-                text = self._extract_text(response.content)
+            response = self._client.chat.completions.create(**kwargs)
+            choice = response.choices[0]
+            message = choice.message
+
+            if choice.finish_reason == "stop":
                 self._store.add_message(channel_id, thread_ts, {
                     "role": "assistant",
-                    "content": text,
+                    "content": message.content or "",
                 })
-                return text
+                return message.content or ""
 
-            if response.stop_reason == "tool_use":
-                tool_results = []
-                assistant_content = []
-
-                for block in response.content:
-                    assistant_content.append(block)
-                    if block.type == "tool_use":
-                        result = self._registry.execute(block.name, block.input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result,
-                        })
-
-                messages.append({"role": "assistant", "content": assistant_content})
-                messages.append({"role": "user", "content": tool_results})
-
-                self._store.add_message(channel_id, thread_ts, {
+            if choice.finish_reason == "tool_calls":
+                assistant_msg = {
                     "role": "assistant",
-                    "content": assistant_content,
-                })
-                self._store.add_message(channel_id, thread_ts, {
-                    "role": "user",
-                    "content": tool_results,
-                })
+                    "content": message.content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in message.tool_calls
+                    ],
+                }
+                messages.append(assistant_msg)
+                self._store.add_message(channel_id, thread_ts, assistant_msg)
+
+                for tc in message.tool_calls:
+                    import json
+                    params = json.loads(tc.function.arguments)
+                    result = self._registry.execute(tc.function.name, params)
+                    tool_msg = {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result,
+                    }
+                    messages.append(tool_msg)
+                    self._store.add_message(channel_id, thread_ts, tool_msg)
 
         return "죄송합니다, 처리 시간이 너무 길어졌습니다. 다시 시도해주세요."
-
-    def _extract_text(self, content) -> str:
-        parts = []
-        for block in content:
-            if block.type == "text":
-                parts.append(block.text)
-        return "\n".join(parts)

@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     slack_app_token: str
 
     # LLM
-    anthropic_api_key: str = ""
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    model: str = "glm-5.1"
 
     # Tools (optional - tools are disabled if not set)
     notion_api_key: str = ""
@@ -17,7 +19,6 @@ class Settings(BaseSettings):
     linear_api_key: str = ""
 
     # Agent
-    model: str = "claude-sonnet-4-20250514"
     max_tool_iterations: int = 8
     max_history_messages: int = 30
 

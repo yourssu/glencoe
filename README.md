@@ -111,5 +111,5 @@ python app.py
 ## 기술 스택
 
 - **Python 3.12** + slack-bolt (Socket Mode)
-- **Claude API** (Anthropic, tool use)
+- **GLM 5.1** (OpenAI 호환 API, tool use)
 - **Docker** + GitHub Actions CI/CD → EC2

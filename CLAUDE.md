@@ -6,7 +6,7 @@
 
 - 언어: Python 3.9+ 호환 (Docker 배포는 3.12). `X | None` 대신 `from __future__ import annotations` 사용
 - 프레임워크: slack-bolt (Socket Mode)
-- LLM: Anthropic Claude API (tool use)
+- LLM: GLM 5.1 (OpenAI 호환 API, tool use), `openai` SDK 사용
 - 설정: Pydantic Settings (`config.py`), `.env` 파일로 관리
 - **절대 `.env` 파일을 커밋하지 않기**
 
@@ -24,6 +24,12 @@
 2. `config.py`에 환경변수 추가 (선택적, 기본값 `""`)
 3. `app.py`의 `create_app()`에서 조건부 등록: `if settings.xxx_key: registry.register(...)`
 4. 도구의 `description`은 Claude가 선택 근거로 사용하므로 한국어/영어 모두 고려
+
+## 커밋 규칙
+
+- 기능 단위로 나눠서 커밋 (한 번에 몰아서 커밋하지 않기)
+- 커밋 메시지: 한국어로로, 변경 내용과 이유를 간결하게 작성
+- 예시: 인프라 구축 → 에이전트 로직 → 도구 추가 → 문서 작성 각각 커밋
 
 ## 컨벤션
 
