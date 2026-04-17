@@ -1,12 +1,9 @@
-import re
-
 from agent.conversation_store import InMemoryConversationStore
 from agent.orchestrator import Orchestrator
 from config import settings
 from handlers.mention import register_handlers
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-from tools.notion.tool import NotionTool
 from tools.registry import ToolRegistry
 
 
@@ -14,8 +11,8 @@ def create_app() -> App:
     app = App(token=settings.slack_bot_token)
 
     registry = ToolRegistry()
-    if settings.notion_api_key:
-        registry.register(NotionTool(settings.notion_api_key))
+
+    # 도구 등록: if settings.xxx_key: registry.register(XxxTool(...))
 
     conversation_store = InMemoryConversationStore(
         max_messages=settings.max_history_messages,
