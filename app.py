@@ -1,21 +1,32 @@
-import os
+import re
+
+from agent.conversation_store import InMemoryConversationStore
+from agent.orchestrator import Orchestrator
+from config import settings
+from handlers.mention import register_handlers
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-
-app = App(token=os.environ["SLACK_BOT_TOKEN"])
-
-
-@app.message("hello")
-def say_hello(message, say):
-    say(f"Hey <@{message['user']}>! 👋")
+from tools.notion.tool import NotionTool
+from tools.registry import ToolRegistry
 
 
-@app.command("/echo")
-def echo_command(ack, say, command):
-    ack()
-    say(command["text"])
+def create_app() -> App:
+    app = App(token=settings.slack_bot_token)
+
+    registry = ToolRegistry()
+    if settings.notion_api_key:
+        registry.register(NotionTool(settings.notion_api_key))
+
+    conversation_store = InMemoryConversationStore(
+        max_messages=settings.max_history_messages,
+    )
+    orchestrator = Orchestrator(registry, conversation_store)
+
+    register_handlers(app, orchestrator)
+    return app
 
 
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
+    app = create_app()
+    handler = SocketModeHandler(app, settings.slack_app_token)
     handler.start()
