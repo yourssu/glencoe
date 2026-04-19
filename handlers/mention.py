@@ -38,7 +38,7 @@ def register_handlers(app: App, orchestrator: Orchestrator) -> None:
 def _respond(orchestrator: Orchestrator, app: App, query: str, channel: str, thread_ts: str) -> None:
     try:
         app.client.assistant_threads_setStatus(
-            status="생각하는 중...", channel_id=channel, thread_ts=thread_ts
+            status="유어슈 동방 뒤지는 중....", channel_id=channel, thread_ts=thread_ts
         )
         answer = orchestrator.process_message(query, channel, thread_ts)
         app.client.chat_postMessage(
