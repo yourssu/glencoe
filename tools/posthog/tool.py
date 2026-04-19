@@ -9,6 +9,7 @@ ACTIONS = {
     "query_insights": "인사이트(분석 리포트)를 조회합니다.",
     "list_feature_flags": "기능 플래그 목록을 조회합니다.",
     "list_dashboards": "대시보드 목록을 조회합니다.",
+    "get_dashboard": "특정 대시보드의 상세 정보와 포함된 인사이트를 조회합니다.",
     "query_hogql": "HogQL 쿼리를 실행합니다.",
     "list_persons": "사용자를 조회합니다.",
     "list_cohorts": "코호트(사용자 그룹) 목록을 조회합니다.",
@@ -77,6 +78,10 @@ class PostHogTool(BaseTool):
                             "type": "string",
                             "description": "사용자 이메일 (list_persons에서 사용)",
                         },
+                        "dashboard_id": {
+                            "type": "string",
+                            "description": "대시보드 ID (get_dashboard에서 사용)",
+                        },
                     },
                     "required": ["action"],
                 },
@@ -100,6 +105,11 @@ class PostHogTool(BaseTool):
             return self._client.list_feature_flags()
         elif action == "list_dashboards":
             return self._client.list_dashboards()
+        elif action == "get_dashboard":
+            dashboard_id = kwargs.get("dashboard_id", "")
+            if not dashboard_id:
+                return "dashboard_id 파라미터가 필요합니다."
+            return self._client.get_dashboard(dashboard_id=dashboard_id)
         elif action == "list_persons":
             return self._client.list_persons(**kwargs)
         elif action == "list_cohorts":
