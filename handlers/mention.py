@@ -40,7 +40,8 @@ def _respond(orchestrator: Orchestrator, app: App, query: str, channel: str, thr
         app.client.assistant_threads_setStatus(
             status="유어슈 동방 뒤지는 중....", channel_id=channel, thread_ts=thread_ts
         )
-        answer = orchestrator.process_message(query, channel, thread_ts)
+        thread_messages = _get_thread_messages(app, channel, thread_ts)
+        answer = orchestrator.process_message(query, channel, thread_ts, thread_messages=thread_messages)
         app.client.chat_postMessage(
             channel=channel, text=answer, thread_ts=thread_ts
         )
@@ -51,3 +52,21 @@ def _respond(orchestrator: Orchestrator, app: App, query: str, channel: str, thr
             text="일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
             thread_ts=thread_ts,
         )
+
+
+def _get_thread_messages(app: App, channel: str, thread_ts: str) -> list[dict]:
+    try:
+        resp = app.client.conversations_replies(channel=channel, ts=thread_ts, limit=200)
+    except Exception as e:
+        logger.warning(f"Failed to fetch thread messages: {e}")
+        return []
+    messages = []
+    for msg in resp.get("messages", []):
+        if msg.get("bot_id"):
+            continue
+        user = msg.get("user", "unknown")
+        text = re.sub(r"<@[A-Z0-9]+>", "", msg.get("text", "")).strip()
+        if not text:
+            continue
+        messages.append({"role": "user", "content": f"[{user}] {text}"})
+    return messages
