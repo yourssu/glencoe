@@ -50,6 +50,9 @@ class PostHogClient:
     def list_dashboards(self) -> str:
         return self._get(self._project_url("dashboards"))
 
+    def get_dashboard(self, dashboard_id: str) -> str:
+        return self._get(f"{self._project_url('dashboards')}{dashboard_id}/")
+
     def query_hogql(self, query: str) -> str:
         url = self._project_url("query")
         body = {"query": {"kind": "HogQLQuery", "query": query}}
