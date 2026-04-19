@@ -24,6 +24,7 @@ class Orchestrator:
         user_message: str,
         channel_id: str,
         thread_ts: str,
+        thread_messages: list[dict] | None = None,
     ) -> str:
         self._store.add_message(channel_id, thread_ts, {
             "role": "user",
@@ -37,7 +38,7 @@ class Orchestrator:
             body = {
                 "model": settings.model,
                 "max_completion_tokens": 4096,
-                "messages": [{"role": "system", "content": self._system_prompt}] + messages,
+                "messages": [{"role": "system", "content": self._system_prompt}] + (thread_messages or []) + messages,
             }
             if tools:
                 body["tools"] = tools
