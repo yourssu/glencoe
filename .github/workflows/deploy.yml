@@ -27,4 +27,8 @@ jobs:
               --restart always \
               -e SLACK_BOT_TOKEN=${{ secrets.SLACK_BOT_TOKEN }} \
               -e SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }} \
+              -e LLM_API_KEY=${{ secrets.LLM_API_KEY }} \
+              -e LLM_BASE_URL=${{ secrets.LLM_BASE_URL }} \
+              -e POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }} \
+              -e POSTHOG_PROJECT_ID=${{ secrets.POSTHOG_PROJECT_ID }} \
               glenpractice-bot
