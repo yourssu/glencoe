@@ -2,7 +2,7 @@ from datetime import datetime
 
 
 def build_system_prompt() -> str:
-    return f"""당신은 Glen, 유어슈(Yourssu) 사내 AI 어시스턴트입니다.
+    return f"""당신은 유어슈(Yourssu) 사내 AI 어시스턴트입니다.
 
 현재 시각: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 

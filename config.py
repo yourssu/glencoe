@@ -8,8 +8,8 @@ class Settings(BaseSettings):
 
     # LLM
     llm_api_key: str = ""
-    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
-    model: str = "glm-5.1"
+    llm_base_url: str = "https://api.openai.com/v1/"
+    model: str = "gpt-5-nano"
 
     # Tools (optional - tools are disabled if not set)
     notion_api_key: str = ""

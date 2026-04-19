@@ -1,9 +1,18 @@
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+
 from agent.conversation_store import InMemoryConversationStore
 from agent.orchestrator import Orchestrator
 from config import settings
 from handlers.mention import register_handlers
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from tools.posthog.client import PostHogClient
+from tools.posthog.tool import PostHogTool
 from tools.registry import ToolRegistry
 
 
@@ -12,7 +21,9 @@ def create_app() -> App:
 
     registry = ToolRegistry()
 
-    # 도구 등록: if settings.xxx_key: registry.register(XxxTool(...))
+    if settings.posthog_api_key and settings.posthog_project_id:
+        ph_client = PostHogClient(settings.posthog_api_key, settings.posthog_project_id)
+        registry.register(PostHogTool(ph_client))
 
     conversation_store = InMemoryConversationStore(
         max_messages=settings.max_history_messages,

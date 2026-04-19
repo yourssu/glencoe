@@ -1,7 +1,11 @@
+import logging
 import re
+import traceback
 
 from agent.orchestrator import Orchestrator
 from slack_bolt import App
+
+logger = logging.getLogger(__name__)
 
 
 def register_handlers(app: App, orchestrator: Orchestrator) -> None:
@@ -11,6 +15,7 @@ def register_handlers(app: App, orchestrator: Orchestrator) -> None:
         if event.get("bot_id"):
             return
         text = re.sub(r"<@[A-Z0-9]+>", "", event.get("text", "")).strip()
+        logger.info(f"app_mention: user={event.get('user')}, text={text}")
         if not text:
             say("네, 무엇을 도와드릴까요?", thread_ts=event.get("thread_ts", event["ts"]))
             return
@@ -18,23 +23,23 @@ def register_handlers(app: App, orchestrator: Orchestrator) -> None:
         _respond(orchestrator, text, event["channel"], thread_ts, say)
 
     @app.event("message")
-    def handle_message(event, say):
+    def handle_dm(event, say):
         if event.get("bot_id"):
             return
-        text = event.get("text", "")
-        if "glen" not in text:
+        if event.get("channel_type") != "im":
             return
-        query = text.replace("glen", "").strip()
-        if not query:
-            say("네, 무엇을 도와드릴까요?", thread_ts=event.get("thread_ts", event["ts"]))
+        text = event.get("text", "").strip()
+        if not text:
             return
+        logger.info(f"dm: user={event.get('user')}, text={text}")
         thread_ts = event.get("thread_ts", event["ts"])
-        _respond(orchestrator, query, event["channel"], thread_ts, say)
+        _respond(orchestrator, text, event["channel"], thread_ts, say)
 
 
 def _respond(orchestrator: Orchestrator, query: str, channel: str, thread_ts: str, say) -> None:
     try:
         answer = orchestrator.process_message(query, channel, thread_ts)
         say(answer, thread_ts=thread_ts)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error processing message: {e}\n{traceback.format_exc()}")
         say("일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", thread_ts=thread_ts)
