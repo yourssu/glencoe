@@ -1,7 +1,14 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_DB: shookie
       POSTGRES_USER: postgres
@@ -23,6 +30,7 @@ services:
       db:
         condition: service_healthy
     restart: always
+    logging: *default-logging
     environment:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       SLACK_APP_TOKEN: ${SLACK_APP_TOKEN}
