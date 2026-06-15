@@ -2,6 +2,7 @@ import { Agent } from "@mastra/core/agent";
 import { buildPostHogInstructions } from "./instructions.js";
 import { posthogDescription } from "./description.js";
 import { createPostHogAgentTools } from "./tools.js";
+import { withSystemPromptLogging } from "../../log-system-prompt.js";
 import type { PostHogClientManager } from "../../../tools/posthog/client.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,7 +13,7 @@ export function createPostHogAgent(manager: PostHogClientManager, model: any) {
     name: "PostHog Analyst",
     instructions: buildPostHogInstructions(manager),
     description: posthogDescription,
-    model,
+    model: withSystemPromptLogging(model, "posthog"),
     tools,
   });
 }
