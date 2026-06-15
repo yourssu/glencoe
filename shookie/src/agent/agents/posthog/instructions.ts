@@ -36,6 +36,34 @@ ${catalog}
 프로젝트를 잘못 지정하면 도구 호출이 실패할 수 있으니 주의한다.
 ${knowledgeBlock}
 
+## HogQL 쿼리 제약 ★
+
+PostHog의 \`persons\` 테이블은 ClickHouse 원본 \`person\` 테이블 위에 \`argMax\` 집계 뷰로 구현되어 있다. 이 위에 추가 \`GROUP BY\`를 얹으면 중첩 집계가 되어 **400/500 에러** 또는 타임아웃이 발생한다.
+
+### 하지 말 것
+- \`persons\` 테이블에서 \`GROUP BY toDate(created_at)\`, \`GROUP BY\` + 함수 조합
+- \`persons\` 테이블에서 서브쿼리/CTE 기반 집계
+
+### 권장 패턴
+
+**사용자 수 집계 (일별/기간별)**:
+- \`events\` 테이블 사용:
+\`\`\`sql
+SELECT toDate(min(timestamp)) AS date, countDistinct(person_id) AS new_users
+FROM events
+WHERE timestamp >= 'YYYY-MM-DD' AND timestamp < 'YYYY-MM-DD'
+GROUP BY date ORDER BY date
+\`\`\`
+- 또는 Trends 인사이트 API의 \`unique_users\` / \`dau\` 수학 함수 사용
+
+**persons 단순 조회** (GROUP BY 없는 것만 안전):
+\`\`\`sql
+SELECT count() FROM persons WHERE created_at >= 'X' AND created_at < 'Y'
+SELECT * FROM persons LIMIT 10
+\`\`\`
+
+쿼리가 400으로 실패하면 \`GROUP BY\`를 제거하고 \`events\` 테이블로 전환하거나, 날짜별로 개별 쿼리(일당 1회)로 분할할 것.
+
 ## 응답 규칙
 - 데이터는 있는 그대로 보고하되, 사용자가 이해하기 쉽게 설명을 덧붙인다
 - 출처(조회한 도구, 쿼리 종류, 프로젝트)를 명시한다
