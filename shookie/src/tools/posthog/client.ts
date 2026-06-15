@@ -133,6 +133,9 @@ export class PostHogClientManager {
   private defaultName: string;
 
   constructor(apiKey: string, entries: PostHogClientEntry[]) {
+    if (entries.length === 0) {
+      throw new Error("PostHogClientManager는 최소 1개의 entries가 필요합니다");
+    }
     this.entries = entries;
     this.defaultName = entries[0].name;
     for (const e of entries) {

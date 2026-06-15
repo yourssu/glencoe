@@ -11,6 +11,12 @@ describe("projects registry", () => {
     expect(Object.keys(PROJECTS)).toEqual(expect.arrayContaining(["ssutime-prod", "soongpt-prod"]));
   });
 
+  it("registry key와 ProjectDefinition.name이 일치한다", () => {
+    for (const [key, def] of Object.entries(PROJECTS)) {
+      expect(def.name).toBe(key);
+    }
+  });
+
   it("ssutime-prod는 PostHog projectId 440922를 갖는다", () => {
     expect(PROJECTS["ssutime-prod"].posthog?.projectId).toBe("440922");
     expect(PROJECTS["ssutime-prod"].posthog?.knowledge).toContain("SSU-Time");
@@ -25,7 +31,7 @@ describe("projects registry", () => {
     const projects = getPostHogProjects();
     expect(projects).toHaveLength(2);
     const displayNames = projects.map((p) => p.displayName);
-    expect(displayNames).toEqual(expect.arrayContaining(["SSUTime-Prod", "soongpt-prod"]));
+    expect(displayNames).toEqual(expect.arrayContaining(["SSUTime-Prod", "Soongpt-Prod"]));
   });
 
   it("getCodeExplorerProjects는 현재 빈 배열을 반환한다", () => {

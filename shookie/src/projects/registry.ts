@@ -7,8 +7,6 @@ export const PROJECTS = {
   "soongpt-prod": soongptProdProject,
 } as const satisfies ProjectRegistry;
 
-export type ProjectKey = keyof typeof PROJECTS;
-
 type WithPostHog = ProjectDefinition & { posthog: NonNullable<ProjectDefinition["posthog"]> };
 type WithCodeExplorer = ProjectDefinition & {
   codeExplorer: NonNullable<ProjectDefinition["codeExplorer"]>;
