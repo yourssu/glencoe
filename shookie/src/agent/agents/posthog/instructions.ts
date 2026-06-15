@@ -1,14 +1,14 @@
 import type { PostHogClientManager } from "../../../tools/posthog/client.js";
-import { getAllPostHogKnowledge } from "../../../knowledge/posthog/index.js";
+import { getPostHogProjects } from "../../../projects/index.js";
 
 export function buildPostHogInstructions(manager: PostHogClientManager): string {
   const catalog = manager.getProjectCatalog();
-  const knowledgeMap = getAllPostHogKnowledge();
+  const activeNames = new Set(manager.getProjectNames());
 
   const knowledgeSections: string[] = [];
-  for (const [projectName, instructions] of knowledgeMap) {
-    if (manager.getProjectNames().includes(projectName)) {
-      knowledgeSections.push(`### ${projectName}\n${instructions}`);
+  for (const p of getPostHogProjects()) {
+    if (activeNames.has(p.displayName) && p.posthog?.knowledge) {
+      knowledgeSections.push(`### ${p.displayName}\n${p.posthog.knowledge}`);
     }
   }
 

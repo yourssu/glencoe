@@ -2,7 +2,8 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createMainShookieAgent } from "./agents/main-shookie/index.js";
 import { createPostHogAgent } from "./agents/posthog/index.js";
 import { createCodeExplorerAgent } from "./agents/code-explorer/index.js";
-import { PostHogClientManager, POSTHOG_PROJECTS } from "../tools/posthog/client.js";
+import { PostHogClientManager } from "../tools/posthog/client.js";
+import { getPostHogProjects } from "../projects/index.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import type { Agent } from "@mastra/core/agent";
@@ -16,8 +17,14 @@ export function createAgent() {
 
   const subAgents: { posthog?: Agent; codeExplorer?: Agent } = {};
 
-  if (POSTHOG_PROJECTS.length > 0 && config.POSTHOG_API_KEY) {
-    const phManager = new PostHogClientManager(config.POSTHOG_API_KEY, POSTHOG_PROJECTS);
+  const phProjects = getPostHogProjects();
+  if (phProjects.length > 0 && config.POSTHOG_API_KEY) {
+    const entries = phProjects.map((p) => ({
+      name: p.displayName,
+      projectId: p.posthog.projectId,
+      description: p.description,
+    }));
+    const phManager = new PostHogClientManager(config.POSTHOG_API_KEY, entries);
     subAgents.posthog = createPostHogAgent(phManager, model);
     logger.info(`PostHog 서브 에이전트 등록 완료 (프로젝트: ${phManager.getProjectNames().join(", ")})`);
   } else {

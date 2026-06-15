@@ -1,10 +1,7 @@
-import type { ProjectKnowledge } from "../types.js";
+export const ssutimePostHogProjectId = "440922";
 
-export const soongptKnowledge: ProjectKnowledge = {
-  key: "soongpt-prod",
-  name: "숭피티",
-  instructions: `
-## Soongpt (숭피티) 프로젝트 지식
+export const ssutimePostHogKnowledge = `
+## SSU-Time (슈타임) 프로젝트 지식
 
 ### 서비스 개요
 <!-- 서비스 설명을 작성하세요 -->
@@ -20,5 +17,4 @@ export const soongptKnowledge: ProjectKnowledge = {
 
 ### HogQL 쿼리 참고사항
 <!-- 쿼리 작성 시 참고할 사항을 작성하세요 -->
-`.trim(),
-};
+`.trim();
