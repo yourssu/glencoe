@@ -2,17 +2,11 @@ import { logger } from "../../logger.js";
 
 const POSTHOG_API_BASE = "https://app.posthog.com/api";
 
-export interface PostHogProject {
+export interface PostHogClientEntry {
   name: string;
   projectId: string;
   description: string;
 }
-
-// PostHog 프로젝트 목록 - 새 프로젝트 추가 시 이곳에 추가
-export const POSTHOG_PROJECTS: PostHogProject[] = [
-  { name: "SSUTime-Prod", projectId: "440922", description: "슈타임 프로덕션" },
-  { name: "soongpt-prod", projectId: "308417", description: "숭피티 프로덕션" },
-];
 
 function truncate(text: string, maxLen = 4000): string {
   if (text.length > maxLen) {
@@ -135,14 +129,17 @@ export class PostHogClient {
 
 export class PostHogClientManager {
   private clients: Map<string, PostHogClient> = new Map();
-  private projects: PostHogProject[];
+  private entries: PostHogClientEntry[];
   private defaultName: string;
 
-  constructor(apiKey: string, projects: PostHogProject[]) {
-    this.projects = projects;
-    this.defaultName = projects[0].name;
-    for (const p of projects) {
-      this.clients.set(p.name, new PostHogClient(apiKey, p.projectId));
+  constructor(apiKey: string, entries: PostHogClientEntry[]) {
+    if (entries.length === 0) {
+      throw new Error("PostHogClientManager는 최소 1개의 entries가 필요합니다");
+    }
+    this.entries = entries;
+    this.defaultName = entries[0].name;
+    for (const e of entries) {
+      this.clients.set(e.name, new PostHogClient(apiKey, e.projectId));
     }
   }
 
@@ -158,11 +155,11 @@ export class PostHogClientManager {
   }
 
   getProjectNames(): string[] {
-    return this.projects.map((p) => p.name);
+    return this.entries.map((p) => p.name);
   }
 
   getProjectCatalog(): string {
-    return this.projects
+    return this.entries
       .map((p) => `- **${p.name}**: ${p.description}`)
       .join("\n");
   }
