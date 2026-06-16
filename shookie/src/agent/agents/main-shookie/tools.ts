@@ -3,6 +3,112 @@ import { z } from "zod";
 import type { Agent } from "@mastra/core/agent";
 import type { RequestContext } from "@mastra/core/request-context";
 import { logger } from "../../../logger.js";
+import { getCurrentContext } from "../../invocation-context.js";
+import {
+  startInvocation,
+  completeInvocation,
+  logToolCall,
+  type AgentName,
+} from "database";
+
+interface SubAgentDelegateOptions {
+  agentName: AgentName;
+  agent: Agent;
+  task: string;
+  maxSteps?: number;
+  requestContext?: RequestContext;
+}
+
+async function delegateToSubAgent(opts: SubAgentDelegateOptions): Promise<string> {
+  const parent = getCurrentContext();
+  const parentInvocationId = parent?.parentInvocationId ?? null;
+  const agentCallId = parent?.agentCallId;
+
+  const invocationId = agentCallId
+    ? await startInvocation({
+        agentCallId,
+        parentInvocationId,
+        agentName: opts.agentName,
+        task: opts.task,
+      })
+    : null;
+
+  try {
+    const generateOpts: { maxSteps?: number; requestContext?: RequestContext } = {};
+    if (opts.maxSteps) generateOpts.maxSteps = opts.maxSteps;
+    if (opts.requestContext) generateOpts.requestContext = opts.requestContext;
+
+    const result = await opts.agent.generate(
+      [{ role: "user", content: opts.task }],
+      generateOpts,
+    );
+    const usage = await result.usage;
+
+    logger.debug(`[${opts.agentName}] text length:`, result.text?.length ?? 0);
+    logger.debug(`[${opts.agentName}] finishReason:`, result.finishReason);
+    logger.debug(`[${opts.agentName}] usage:`, JSON.stringify(usage));
+    logger.debug(`[${opts.agentName}] steps:`, result.steps?.length);
+
+    if (invocationId) {
+      for (const [i, step] of (result.steps ?? []).entries()) {
+        const toolCalls = step.toolCalls ?? [];
+        const toolResults = step.toolResults ?? [];
+        const resultsById = new Map<string, unknown>();
+        for (const tr of toolResults) {
+          const id = (tr.payload as { id?: string; toolCallId?: string }).id
+            ?? (tr.payload as { toolCallId?: string }).toolCallId;
+          if (id) resultsById.set(id, tr.payload.result);
+        }
+        for (const tc of toolCalls) {
+          const id = (tc.payload as { id?: string; toolCallId?: string }).id
+            ?? (tc.payload as { toolCallId?: string }).toolCallId;
+          const toolName = tc.payload.toolName;
+          const input = (tc.payload as { args?: unknown }).args;
+          const output = id ? resultsById.get(id) : undefined;
+          await logToolCall({
+            invocationId,
+            stepIndex: i,
+            toolName,
+            input,
+            output,
+          });
+        }
+      }
+    }
+
+    for (const [i, step] of (result.steps ?? []).entries()) {
+      for (const tc of step.toolCalls ?? []) {
+        logger.debug(`[${opts.agentName}] step[${i}] toolCall: ${tc.payload.toolName}`, JSON.stringify(tc.payload.args));
+      }
+      for (const tr of step.toolResults ?? []) {
+        const r = typeof tr.payload.result === "string" ? tr.payload.result : JSON.stringify(tr.payload.result);
+        logger.debug(`[${opts.agentName}] step[${i}] toolResult:`, r.slice(0, 500));
+      }
+    }
+
+    if (invocationId) {
+      await completeInvocation(invocationId, {
+        status: "success",
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        cachedInputTokens: usage?.cachedInputTokens ?? 0,
+        reasoningTokens: usage?.reasoningTokens ?? 0,
+        finishReason: typeof result.finishReason === "string" ? result.finishReason : String(result.finishReason ?? ""),
+      });
+    }
+
+    return result.text;
+  } catch (err) {
+    if (invocationId) {
+      await completeInvocation(invocationId, {
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+        finishReason: "error",
+      });
+    }
+    throw err;
+  }
+}
 
 export function createMainShookieTools(subAgents: {
   posthog?: Agent;
@@ -24,21 +130,12 @@ export function createMainShookieTools(subAgents: {
         result: z.string(),
       }),
       execute: async (input) => {
-        const result = await posthogAgent.generate([{ role: "user", content: input.task }]);
-        logger.debug("[posthog-agent] text length:", result.text?.length ?? 0);
-        logger.debug("[posthog-agent] finishReason:", result.finishReason);
-        logger.debug("[posthog-agent] usage:", JSON.stringify(await result.usage));
-        logger.debug("[posthog-agent] steps:", result.steps?.length);
-        for (const [i, step] of (result.steps ?? []).entries()) {
-          for (const tc of step.toolCalls ?? []) {
-            logger.debug(`[posthog-agent] step[${i}] toolCall: ${tc.payload.toolName}`, JSON.stringify(tc.payload.args));
-          }
-          for (const tr of step.toolResults ?? []) {
-            const r = typeof tr.payload.result === "string" ? tr.payload.result : JSON.stringify(tr.payload.result);
-            logger.debug(`[posthog-agent] step[${i}] toolResult:`, r.slice(0, 500));
-          }
-        }
-        return { result: result.text };
+        const result = await delegateToSubAgent({
+          agentName: "posthog",
+          agent: posthogAgent,
+          task: input.task,
+        });
+        return { result };
       },
     });
   }
@@ -58,28 +155,17 @@ export function createMainShookieTools(subAgents: {
         result: z.string(),
       }),
       execute: async (input, context) => {
-        const opts: { requestContext?: RequestContext } = {};
+        const opts: { requestContext?: RequestContext; maxSteps: number } = { maxSteps: 20 };
         if (context?.requestContext) {
           opts.requestContext = context.requestContext;
         }
-        const result = await codeExplorerAgent.generate(
-          [{ role: "user", content: input.task }],
-          { ...opts, maxSteps: 20 },
-        );
-        logger.debug("[code-explorer-agent] text length:", result.text?.length ?? 0);
-        logger.debug("[code-explorer-agent] finishReason:", result.finishReason);
-        logger.debug("[code-explorer-agent] usage:", JSON.stringify(await result.usage));
-        logger.debug("[code-explorer-agent] steps:", result.steps?.length);
-        for (const [i, step] of (result.steps ?? []).entries()) {
-          for (const tc of step.toolCalls ?? []) {
-            logger.debug(`[code-explorer-agent] step[${i}] toolCall: ${tc.payload.toolName}`, JSON.stringify(tc.payload.args));
-          }
-          for (const tr of step.toolResults ?? []) {
-            const r = typeof tr.payload.result === "string" ? tr.payload.result : JSON.stringify(tr.payload.result);
-            logger.debug(`[code-explorer-agent] step[${i}] toolResult:`, r.slice(0, 500));
-          }
-        }
-        return { result: result.text };
+        const result = await delegateToSubAgent({
+          agentName: "code-explorer",
+          agent: codeExplorerAgent,
+          task: input.task,
+          ...opts,
+        });
+        return { result };
       },
     });
   }
