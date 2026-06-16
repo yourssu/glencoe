@@ -64,8 +64,8 @@ yarn workspace shookie test     # 테스트
 
 ## EC2 접속
 
-- 키 파일: `~/.ssh/<SSH_KEY_PATH>`
+민감 정보(키 경로, 퍼블릭 IP, 비밀번호)는 팀 내부 공유 채널 또는 GitHub Secrets에서 확인.
+
 - 사용자: `ubuntu`
-- 퍼블릭 IP: `<EC2_HOST>`
-- 접속: `ssh -i ~/.ssh/<SSH_KEY_PATH> ubuntu@<EC2_HOST>`
+- 접속: `ssh -i <SSH_KEY_PATH> ubuntu@<EC2_HOST>` (값은 팀 내부 공유)
 - 배포: main push 시 GitHub Actions가 자동으로 `docker compose` 배포
