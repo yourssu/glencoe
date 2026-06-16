@@ -21,8 +21,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
+            git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
             cd /home/ubuntu/shookie
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
             docker stop shookie-bot || true
             docker rm shookie-bot || true
             docker compose down || true
