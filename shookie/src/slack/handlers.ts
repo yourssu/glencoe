@@ -7,7 +7,15 @@ import { convertMarkdownToBlocks } from "./markdown-to-blocks.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { ensureThreadCapacity } from "../tools/code-explorer/workspace-manager.js";
-import { logAgentCall } from "database";
+import {
+  logAgentCall,
+  startAgentCall,
+  completeAgentCall,
+  startInvocation,
+  completeInvocation,
+  logToolCall,
+} from "database";
+import { invocationStorage } from "../agent/invocation-context.js";
 
 const store = new InMemoryConversationStore();
 
@@ -54,6 +62,7 @@ async function handleConversation(
   userId: string,
 ): Promise<void> {
   const sessionId = buildSessionId(channel, threadTs);
+  let mainInvocationId: number | null = null;
 
   try {
     logger.info(`📩 메시지 수신: "${userText.slice(0, 100)}"`);
@@ -65,52 +74,76 @@ async function handleConversation(
     const history = store.buildMessages(sessionId);
     const prompt = history.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n");
 
-    logger.info("🤖 응답 스트리밍 시작...");
-    const requestContext = new RequestContext([
-      ["channel", channel],
-      ["threadTs", threadTs],
-    ]);
-    const streamResult = await agent.stream([{ role: "user", content: prompt }], {
-      maxSteps: config.MAX_TOOL_ITERATIONS,
-      requestContext,
-    });
+    const callCtx = await startAgentCall({ userId, channel, threadTs, question: userText });
+    mainInvocationId = callCtx
+      ? await startInvocation({
+          agentCallId: callCtx.agentCallId,
+          parentInvocationId: null,
+          agentName: "main-shookie",
+          task: userText,
+        })
+      : null;
 
-    const toolNamesSeen: string[] = [];
-    const sentProgressMessages = new Set<string>();
+    const runConversation = async () => {
+      logger.info("🤖 응답 스트리밍 시작...");
+      const requestContext = new RequestContext([
+        ["channel", channel],
+        ["threadTs", threadTs],
+      ]);
+      const streamResult = await agent.stream([{ role: "user", content: prompt }], {
+        maxSteps: config.MAX_TOOL_ITERATIONS,
+        requestContext,
+      });
 
-    const reader = streamResult.fullStream.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const toolNamesSeen: string[] = [];
+      const sentProgressMessages = new Set<string>();
 
-        if (value.type === "tool-call") {
-          const toolName = (value as { payload: { toolName: string } }).payload.toolName;
-          if (!toolNamesSeen.includes(toolName)) {
-            toolNamesSeen.push(toolName);
-          }
+      const reader = streamResult.fullStream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-          const progressMsg = TOOL_PROGRESS_MESSAGES[toolName];
-          if (progressMsg && !sentProgressMessages.has(toolName)) {
-            sentProgressMessages.add(toolName);
-            await app.client.chat.postMessage({
-              channel,
-              thread_ts: threadTs,
-              text: progressMsg,
-            });
+          if (value.type === "tool-call") {
+            const toolName = (value as { payload: { toolName: string } }).payload.toolName;
+            if (!toolNamesSeen.includes(toolName)) {
+              toolNamesSeen.push(toolName);
+            }
+
+            const progressMsg = TOOL_PROGRESS_MESSAGES[toolName];
+            if (progressMsg && !sentProgressMessages.has(toolName)) {
+              sentProgressMessages.add(toolName);
+              await app.client.chat.postMessage({
+                channel,
+                thread_ts: threadTs,
+                text: progressMsg,
+              });
+            }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
-    } finally {
-      reader.releaseLock();
-    }
 
-    logger.info("🤖 응답 스트리밍 완료");
+      logger.info("🤖 응답 스트리밍 완료");
 
-    const responseText = (await streamResult.text) || "응답을 생성하지 못했습니다.";
+      const responseText = (await streamResult.text) || "응답을 생성하지 못했습니다.";
+      const usage = await streamResult.usage;
+      const steps = await streamResult.steps;
+      const finishReason = await streamResult.finishReason;
 
-    const usage = await streamResult.usage;
-    const steps = await streamResult.steps;
+      return { streamResult, responseText, usage, steps, finishReason, toolNamesSeen };
+    };
+
+    const alsCtx = callCtx && mainInvocationId
+      ? { agentCallId: callCtx.agentCallId, parentInvocationId: mainInvocationId }
+      : undefined;
+
+    const conv = alsCtx
+      ? await invocationStorage.run(alsCtx, runConversation)
+      : await runConversation();
+
+    const { responseText, usage, steps, finishReason, toolNamesSeen } = conv;
     const inputTokens = usage?.inputTokens ?? 0;
     const outputTokens = usage?.outputTokens ?? 0;
 
@@ -118,7 +151,7 @@ async function handleConversation(
     logger.debug("result.usage:", JSON.stringify(usage));
     logger.debug("result.steps count:", steps.length);
     logger.debug("result.text length:", responseText.length);
-    logger.debug("result.finishReason:", await streamResult.finishReason);
+    logger.debug("result.finishReason:", finishReason);
 
     for (const [i, step] of steps.entries()) {
       logger.debug(`--- step[${i}] ---`);
@@ -131,6 +164,60 @@ async function handleConversation(
         const r = typeof tr.payload.result === "string" ? tr.payload.result : JSON.stringify(tr.payload.result);
         logger.debug(`step[${i}] toolResult:`, r.slice(0, 500));
       }
+    }
+
+    if (callCtx && mainInvocationId) {
+      for (const [i, step] of steps.entries()) {
+        const toolCalls = step.toolCalls ?? [];
+        const toolResults = step.toolResults ?? [];
+        const resultsById = new Map<string, unknown>();
+        for (const tr of toolResults) {
+          const id = (tr.payload as { id?: string; toolCallId?: string }).id
+            ?? (tr.payload as { toolCallId?: string }).toolCallId;
+          if (id) resultsById.set(id, tr.payload.result);
+        }
+        for (const tc of toolCalls) {
+          const id = (tc.payload as { id?: string; toolCallId?: string }).id
+            ?? (tc.payload as { toolCallId?: string }).toolCallId;
+          const toolName = tc.payload.toolName;
+          const input = (tc.payload as { args?: unknown }).args;
+          const output = id ? resultsById.get(id) : undefined;
+          await logToolCall({
+            invocationId: mainInvocationId,
+            stepIndex: i,
+            toolName,
+            input,
+            output,
+          });
+        }
+      }
+
+      await completeInvocation(mainInvocationId, {
+        status: "success",
+        inputTokens,
+        outputTokens,
+        cachedInputTokens: usage?.cachedInputTokens ?? 0,
+        reasoningTokens: usage?.reasoningTokens ?? 0,
+        finishReason: typeof finishReason === "string" ? finishReason : String(finishReason ?? ""),
+      });
+
+      await completeAgentCall(callCtx.agentCallId, {
+        answer: responseText,
+        toolsUsed: [...new Set(toolNamesSeen)],
+        inputTokens,
+        outputTokens,
+      });
+    } else {
+      await logAgentCall({
+        userId,
+        channel,
+        threadTs,
+        question: userText,
+        answer: responseText,
+        toolsUsed: [...new Set(toolNamesSeen)],
+        inputTokens,
+        outputTokens,
+      });
     }
 
     const debugFooter = [
@@ -149,17 +236,6 @@ async function handleConversation(
       text: fallbackText,
       blocks,
     });
-
-    await logAgentCall({
-      userId,
-      channel,
-      threadTs,
-      question: userText,
-      answer: responseText,
-      toolsUsed: [...new Set(toolNamesSeen)],
-      inputTokens,
-      outputTokens,
-    });
   } catch (error) {
     logger.error("Error processing message:", error);
     if (error instanceof Error) {
@@ -168,6 +244,13 @@ async function handleConversation(
       if ("cause" in error) {
         logger.error("Error cause:", JSON.stringify(error.cause, null, 2));
       }
+    }
+    if (mainInvocationId) {
+      await completeInvocation(mainInvocationId, {
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+        finishReason: "error",
+      });
     }
     await app.client.chat.postMessage({
       channel,
