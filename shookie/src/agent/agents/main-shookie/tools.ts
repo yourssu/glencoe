@@ -33,7 +33,6 @@ async function delegateToSubAgent(opts: SubAgentDelegateOptions): Promise<string
       })
     : null;
 
-  const startedAt = Date.now();
   try {
     const generateOpts: { maxSteps?: number; requestContext?: RequestContext } = {};
     if (opts.maxSteps) generateOpts.maxSteps = opts.maxSteps;
@@ -43,21 +42,29 @@ async function delegateToSubAgent(opts: SubAgentDelegateOptions): Promise<string
       [{ role: "user", content: opts.task }],
       generateOpts,
     );
+    const usage = await result.usage;
 
     logger.debug(`[${opts.agentName}] text length:`, result.text?.length ?? 0);
     logger.debug(`[${opts.agentName}] finishReason:`, result.finishReason);
-    logger.debug(`[${opts.agentName}] usage:`, JSON.stringify(await result.usage));
+    logger.debug(`[${opts.agentName}] usage:`, JSON.stringify(usage));
     logger.debug(`[${opts.agentName}] steps:`, result.steps?.length);
 
     if (invocationId) {
       for (const [i, step] of (result.steps ?? []).entries()) {
         const toolCalls = step.toolCalls ?? [];
         const toolResults = step.toolResults ?? [];
-        for (const [j, tc] of toolCalls.entries()) {
-          const tr = toolResults[j];
+        const resultsById = new Map<string, unknown>();
+        for (const tr of toolResults) {
+          const id = (tr.payload as { id?: string; toolCallId?: string }).id
+            ?? (tr.payload as { toolCallId?: string }).toolCallId;
+          if (id) resultsById.set(id, tr.payload.result);
+        }
+        for (const tc of toolCalls) {
+          const id = (tc.payload as { id?: string; toolCallId?: string }).id
+            ?? (tc.payload as { toolCallId?: string }).toolCallId;
           const toolName = tc.payload.toolName;
           const input = (tc.payload as { args?: unknown }).args;
-          const output = tr?.payload?.result;
+          const output = id ? resultsById.get(id) : undefined;
           await logToolCall({
             invocationId,
             stepIndex: i,
@@ -80,7 +87,6 @@ async function delegateToSubAgent(opts: SubAgentDelegateOptions): Promise<string
     }
 
     if (invocationId) {
-      const usage = await result.usage;
       await completeInvocation(invocationId, {
         status: "success",
         inputTokens: usage?.inputTokens ?? 0,
