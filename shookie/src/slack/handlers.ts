@@ -170,11 +170,18 @@ async function handleConversation(
       for (const [i, step] of steps.entries()) {
         const toolCalls = step.toolCalls ?? [];
         const toolResults = step.toolResults ?? [];
-        for (const [j, tc] of toolCalls.entries()) {
-          const tr = toolResults[j];
+        const resultsById = new Map<string, unknown>();
+        for (const tr of toolResults) {
+          const id = (tr.payload as { id?: string; toolCallId?: string }).id
+            ?? (tr.payload as { toolCallId?: string }).toolCallId;
+          if (id) resultsById.set(id, tr.payload.result);
+        }
+        for (const tc of toolCalls) {
+          const id = (tc.payload as { id?: string; toolCallId?: string }).id
+            ?? (tc.payload as { toolCallId?: string }).toolCallId;
           const toolName = tc.payload.toolName;
           const input = (tc.payload as { args?: unknown }).args;
-          const output = tr?.payload?.result;
+          const output = id ? resultsById.get(id) : undefined;
           await logToolCall({
             invocationId: mainInvocationId,
             stepIndex: i,
