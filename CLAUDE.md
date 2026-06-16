@@ -69,3 +69,10 @@ yarn workspace shookie test     # 테스트
 - 사용자: `ubuntu`
 - 접속: `ssh -i <SSH_KEY_PATH> ubuntu@<EC2_HOST>` (값은 팀 내부 공유)
 - 배포: main push 시 GitHub Actions가 자동으로 `docker compose` 배포
+
+## 배포 파이프라인 신뢰성
+
+- `set -e`로 빌드 실패 시 silent success 차단
+- 동시 실행 race condition 방지용 `concurrency` 그룹
+- 매 배포 전 `docker builder prune -af` + `docker image prune -f`로 디스크 누적 방지
+- 컨테이너 로그는 `max-size: 50m, max-file: 5` 로 로테이션
