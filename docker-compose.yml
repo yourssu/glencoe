@@ -9,6 +9,8 @@ services:
     image: postgres:16
     restart: always
     logging: *default-logging
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: shookie
       POSTGRES_USER: postgres
