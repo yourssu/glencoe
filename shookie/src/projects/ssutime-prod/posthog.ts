@@ -36,7 +36,7 @@ SSU-Time(슈타임) — 숭실대학교 시간표/공강 관리 모바일 앱. �
 
 **과제 (Task)**
 - \`task_detail_expand\` / \`task_detail_collapse\`: 과제 상세 펼치기/접기
-- \`todo_snapshot\`: 할 일 스냅샷
+- \`todo_snapshot\`: 할 일 스냅샷 (크롤링 이벤트 — 사용자 액션이 아닌 자동 발생 이벤트)
 - \`submit_complete_click\`: 제출 완료 클릭
 
 **홈 화면 위젯**
@@ -85,4 +85,5 @@ ORDER BY date
 - 일자별 집계는 \`events\` 테이블 기준. \`persons\`는 \`GROUP BY\` 없는 단순 조회만 안전.
 - 사용자 수 카운트: \`uniqExact(person_id)\` (정확) 또는 \`countDistinct(person_id)\`.
 - 시간대 변환: \`toTimeZone(timestamp, 'Asia/Seoul')\` 후 \`toDate()\`.
+- **DAU/유저 리텐션 계산 시 주의**: \`todo_snapshot\` 이벤트는 크롤링으로 자동 발생하는 이벤트이므로, DAU(Daily Active Users)나 유저 리텐션(User Retention) 지표에서 반드시 제외해야 함. 예: \`WHERE event != 'todo_snapshot'\`.
 `.trim();
