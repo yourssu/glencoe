@@ -21,6 +21,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
+            # 이전 GITHUB_TOKEN 기반 url 설정 초기화 (토큰 만료/누적 방지)
+            git config --global --get-regexp '^url\.' 2>/dev/null | awk '{print $1}' | while read key; do git config --global --unset-all "$key" 2>/dev/null || true; done
+            # 새 토큰으로 설정
             git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
             cd /home/ubuntu/shookie
             git fetch origin
