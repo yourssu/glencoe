@@ -28,9 +28,15 @@ export function buildCodeExplorerInstructions(config: CodeExplorerConfig): strin
 
 ### 3.3 코드 수정 및 PR
 1. Workspace 파일 도구(write_file, edit_file)로 파일 수정
-2. run_authenticated로 git add, git commit, git push 실행
+2. run_authenticated로 순서대로 실행:
+   - git checkout -b <branch>
+   - git add <files>
+   - git diff --staged (변경 내용 최종 확인)
+   - git commit -m "메시지"
+   - git push -u origin <branch>
 3. run_authenticated로 gh pr create 실행
    - 명령: command="gh", args=["pr", "create", "--title", "제목", "--body", "설명"]
+4. **주의**: commit 후 git add를 다시 호출하지 말 것. 이미 커밋된 파일은 add 대상이 아님.
 
 ### 3.4 작업 완료
 - finish_thread_workspace로 워크스페이스 정리
@@ -41,6 +47,7 @@ main-shookie가 PostHog 사실 정보와 함께 "도메인 지식 업데이트" 
 
 **대상 파일**: \`shookie/src/projects/<project>/posthog.ts\`
 - \`<project>\`는 ssutime-prod, soongpt-prod 등 kebab-case 식별자
+- **사전 확인 (필수)** — 첫 read_file 전에 반드시 \`list_files shookie/src/projects\`로 실제 디렉토리명 확인. main-shookie가 task에서 알려준 식별자(예: \`ssutime-prod\`)를 그대로 사용하고 변환/축약(예: \`ssutime-prod\` → \`ssutim\`) 금지.
 - 파일에서 \`<project>PostHogKnowledge\` 변수(예: \`ssutimePostHogKnowledge\`)가 템플릿 문자열로 정의되어 있음
 - 변수가 없으면 새로 만들지 말고 main-shookie에게 사실 보고 (파일 없음)
 
@@ -60,6 +67,8 @@ main-shookie가 PostHog 사실 정보와 함께 "도메인 지식 업데이트" 
 4. **중복 제거** — 이미 있는 이벤트/속성은 덮어쓰기, 새 항목만 추가
 5. **포맷 일관성** — 백틱, 코드 펜스 이스케이프 주의. 템플릿 문자열 안이므로 내부 백틱은 \\\`로 이스케이프
 6. **빌드 검증은 CI에 위임** — run_authenticated는 git/gh만 허용하므로 \`yarn workspace shookie build\` 같은 로컬 빌드 명령은 거부됨. TypeScript 에러는 PR 머지 시 GitHub Actions가 잡으므로 로컬에서는 생략. 커밋 전 백틱/이스케이프만 육안으로 확인.
+7. **편집 효율** — 여러 섹션을 수정할 때 각 섹션당 1회의 edit_file 호출로 처리. old_string/new_string에 여러 줄을 한꺼번에 교체. 같은 파일에 대해 edit_file을 반복 호출하지 말 것.
+8. **재탐색 최소화** — edit_file 결과 메시지(\`Replaced N occurrences\`)로 성공 여부를 확인 가능. 편집 후 read_file로 전체 파일을 다시 읽지 말 것. 최종 확인은 git diff --staged로 충분. list_files는 경로 확인 목적으로 1회만 사용.
 
 **보안 (도메인 지식 특화)**:
 - 실제 사용자 ID, 이메일, 전화번호, API 키, 토큰을 도메인 지식에 절대 포함 금지
