@@ -35,6 +35,53 @@ export function buildCodeExplorerInstructions(config: CodeExplorerConfig): strin
 ### 3.4 작업 완료
 - finish_thread_workspace로 워크스페이스 정리
 
+### 3.5 도메인 지식 파일 편집 (특수 케이스)
+
+main-shookie가 PostHog 사실 정보와 함께 "도메인 지식 업데이트" 작업을 위임하면, 다음 규칙에 따라 shookie 프로젝트의 도메인 지식을 갱신하고 PR을 생성한다.
+
+**대상 파일**: \`shookie/src/projects/<project>/posthog.ts\`
+- \`<project>\`는 ssutime-prod, soongpt-prod 등 kebab-case 식별자
+- 파일에서 \`<project>PostHogKnowledge\` 변수(예: \`ssutimePostHogKnowledge\`)가 템플릿 문자열로 정의되어 있음
+- 변수가 없으면 새로 만들지 말고 main-shookie에게 사실 보고 (파일 없음)
+
+**스키마 구조 (SSUTime-Prod 참고, 섹션 유지 원칙)**:
+- 서비스 개요
+- 사용자 식별자 (User Schema)
+- 사용자 속성
+- 주요 이벤트 (Event Spec) — 카테고리별 그룹화
+- 신규 유저 정의 (권장 쿼리 패턴 포함)
+- 비즈니스 컨텍스트
+- HogQL 쿼리 팁
+
+**편집 규칙**:
+1. **기존 섹션 유지** — 새 사실은 해당 섹션에 추가, 섹션 통째로 교체 금지
+2. **사실만 반영** — main-shookie가 PostHog 결과로 전달한 구체적 사실(이벤트명, 속성명)만 추가. 추론/가설 금지.
+3. **이벤트/속성명 정확한 스펠링** — PostHog가 응답한 그대로 사용 (예: \`login_success\`, \`view_home\`). camelCase로 변환 금지, 스네이크 케이스 유지.
+4. **중복 제거** — 이미 있는 이벤트/속성은 덮어쓰기, 새 항목만 추가
+5. **포맷 일관성** — 백틱, 코드 펜스 이스케이프 주의. 템플릿 문자열 안이므로 내부 백틱은 \\\`로 이스케이프
+6. **빌드 검증 (필수)** — 수정 후 \`yarn workspace shookie build\` 로 TypeScript 에러 없는지 검증. 빌드 실패 시 PR 생성 금지.
+
+**보안 (도메인 지식 특화)**:
+- 실제 사용자 ID, 이메일, 전화번호, API 키, 토큰을 도메인 지식에 절대 포함 금지
+- 예시 값은 더미(\`<user_id>\`, \`user@example.com\` 등)만 사용
+- 도메인 지식은 PostHog 에이전트 system prompt에 주입되어 LLM 컨텍스트에 노출되므로, 민감 정보 노출 시 비용/보안 위험
+
+**PR 본문 템플릿**:
+\`\`\`markdown
+## Summary
+- <project> 도메인 지식 업데이트
+
+## 변경 사항
+- <새로 추가/수정된 섹션 요약, 불릿 형태>
+
+## 사실 근거
+- PostHog 에이전트가 조회한 스키마 기반 (이벤트 N개, 속성 M개 확인)
+
+## 영향 범위
+- PostHog 에이전트 system prompt에 주입되어 향후 쿼리 정확도 향상
+- 사용자 검토 후 머지
+\`\`\`
+
 ## 4. 보안 규칙
 - 모든 명령은 워크스페이스 디렉토리 내에서만 실행한다
 - 워크스페이스 외부 경로에 접근하지 않는다

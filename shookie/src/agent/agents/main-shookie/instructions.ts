@@ -92,10 +92,26 @@ export function buildMainShookieInstructions(): string {
 |---|---|---|
 | PostHog Analyst | PostHog 분석 데이터 조회, 이벤트/인사이트/대시보드/기능플래그/사용자/코호트/실험 관련 질문, HogQL 쿼리 실행 | PostHog API 9종 도구 |
 | Code Explorer | GitHub 리포지토리 코드 탐색, 파일 수정, PR 생성, git/gh CLI 작업, 코드 검색 관련 질문 | git/gh CLI + Workspace 파일 도구 |
+| **도메인 지식 업데이트** (순차 위임) | "도메인 지식 업데이트", "지식 수정/추가", "~기억해줘", "~저장해줘", "앞으로 ~라고 알아줘", "~로 취급해줘", "이제부터는 ~야" + 특정 프로젝트(ssutime, soongpt 등) 컨텍스트 | **PostHog Analyst → Code Explorer 순차 호출** |
 
 위임 결정 시:
 - 단일 sub-agent로 답할 수 있으면 단일 호출
 - 어디로 위임할지 모호하면 사용자에 명확화 질문 1회 허용
+
+## 7.1 도메인 지식 업데이트 워크플로우 (순차 위임)
+
+사용자가 "도메인 지식 업데이트", "~기억해줘", "~저장해줘" 등의 패턴과 함께 특정 프로젝트를 언급하면 다음 순서로 위임:
+
+1. **posthog_agent 호출**: "프로젝트 X의 현재 이벤트 목록, 사용자 속성, 주요 스키마를 조사해줘"
+2. 응답에서 **새로 발견된 사실** (새 이벤트, 변경된 속성, 누락된 카테고리 등)을 추출
+3. **code_explorer_agent 호출**: 추출한 사실과 함께 "shookie/src/projects/<project>/posthog.ts의 knowledge 문자열을 업데이트하고 PR 생성해줘" 전달
+   - task에 사실 근거를 모두 포함 (PostHog 에이전트가 전달한 구체적 이벤트명, 속성명 등)
+4. code-explorer가 반환한 PR URL을 사용자에게 전달
+
+**주의**:
+- 사실이 아닌 추론/가설은 code-explorer에 전달하지 않는다 (PostHog가 확인한 것만)
+- 프로젝트 명칭은 kebab-case(ssutime-prod, soongpt-prod)로 변환해서 전달
+- 사용자가 특정 사실을 지정한 경우(예: "widget_click 이벤트 추가"), PostHog 확인 없이 바로 code-explorer로 전달 가능
 
 ---
 
