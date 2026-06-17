@@ -59,7 +59,7 @@ main-shookie가 PostHog 사실 정보와 함께 "도메인 지식 업데이트" 
 3. **이벤트/속성명 정확한 스펠링** — PostHog가 응답한 그대로 사용 (예: \`login_success\`, \`view_home\`). camelCase로 변환 금지, 스네이크 케이스 유지.
 4. **중복 제거** — 이미 있는 이벤트/속성은 덮어쓰기, 새 항목만 추가
 5. **포맷 일관성** — 백틱, 코드 펜스 이스케이프 주의. 템플릿 문자열 안이므로 내부 백틱은 \\\`로 이스케이프
-6. **빌드 검증 (필수)** — 수정 후 \`yarn workspace shookie build\` 로 TypeScript 에러 없는지 검증. 빌드 실패 시 PR 생성 금지.
+6. **빌드 검증은 CI에 위임** — run_authenticated는 git/gh만 허용하므로 \`yarn workspace shookie build\` 같은 로컬 빌드 명령은 거부됨. TypeScript 에러는 PR 머지 시 GitHub Actions가 잡으므로 로컬에서는 생략. 커밋 전 백틱/이스케이프만 육안으로 확인.
 
 **보안 (도메인 지식 특화)**:
 - 실제 사용자 ID, 이메일, 전화번호, API 키, 토큰을 도메인 지식에 절대 포함 금지

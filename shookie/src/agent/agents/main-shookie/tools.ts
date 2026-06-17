@@ -155,7 +155,7 @@ export function createMainShookieTools(subAgents: {
         result: z.string(),
       }),
       execute: async (input, context) => {
-        const opts: { requestContext?: RequestContext; maxSteps: number } = { maxSteps: 20 };
+        const opts: { requestContext?: RequestContext; maxSteps: number } = { maxSteps: 40 };
         if (context?.requestContext) {
           opts.requestContext = context.requestContext;
         }
