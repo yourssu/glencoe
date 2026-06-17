@@ -19,6 +19,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./database/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
       - ./database/migrations/002_add_sessions_and_invocations.sql:/docker-entrypoint-initdb.d/002_add_sessions_and_invocations.sql
+      - ./database/migrations/003_backfill_session_titles.sql:/docker-entrypoint-initdb.d/003_backfill_session_titles.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

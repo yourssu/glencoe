@@ -20,22 +20,31 @@ function buildSessionKey(channel: string, threadTs: string): string {
   return `${channel}:${threadTs}`;
 }
 
+const TITLE_MAX_LENGTH = 80;
+
+function truncateForTitle(text: string): string {
+  const firstLine = text.split(/\r?\n/)[0]?.trim() ?? "";
+  if (firstLine.length <= TITLE_MAX_LENGTH) return firstLine;
+  return `${firstLine.slice(0, TITLE_MAX_LENGTH)}...`;
+}
+
 export async function upsertSession(rec: {
   userId: string;
   channel: string;
   threadTs: string;
+  title?: string;
 }): Promise<number | null> {
   const pool = getPool();
   const sessionKey = buildSessionKey(rec.channel, rec.threadTs);
   try {
     const result = await pool.query(
-      `INSERT INTO sessions (session_key, user_id, channel, thread_ts, created_at, last_active_at, message_count)
-       VALUES ($1, $2, $3, $4, now(), now(), 1)
+      `INSERT INTO sessions (session_key, user_id, channel, thread_ts, title, created_at, last_active_at, message_count)
+       VALUES ($1, $2, $3, $4, $5, now(), now(), 1)
        ON CONFLICT (session_key) DO UPDATE
        SET last_active_at = now(),
            message_count = sessions.message_count + 1
        RETURNING id`,
-      [sessionKey, rec.userId, rec.channel, rec.threadTs],
+      [sessionKey, rec.userId, rec.channel, rec.threadTs, rec.title ?? null],
     );
     return result.rows[0]?.id ?? null;
   } catch (err) {
@@ -46,7 +55,13 @@ export async function upsertSession(rec: {
 
 export async function logAgentCall(record: AgentCallRecord): Promise<AgentCallResult | null> {
   try {
-    const sessionId = await upsertSession(record);
+    const titleText = truncateForTitle(record.question);
+    const sessionId = await upsertSession({
+      userId: record.userId,
+      channel: record.channel,
+      threadTs: record.threadTs,
+      title: titleText.length > 0 ? titleText : undefined,
+    });
     if (!sessionId) return null;
 
     const pool = getPool();
@@ -91,7 +106,13 @@ export interface AgentCallCompletion {
 
 export async function startAgentCall(rec: PendingAgentCall): Promise<AgentCallResult | null> {
   try {
-    const sessionId = await upsertSession(rec);
+    const titleText = truncateForTitle(rec.question);
+    const sessionId = await upsertSession({
+      userId: rec.userId,
+      channel: rec.channel,
+      threadTs: rec.threadTs,
+      title: titleText.length > 0 ? titleText : undefined,
+    });
     if (!sessionId) return null;
 
     const pool = getPool();
