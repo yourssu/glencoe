@@ -8,7 +8,7 @@ SSU-Time(슈타임) — 숭실대학교 시간표/공강 관리 모바일 앱. �
 
 ### 사용자 식별자 (User Schema)
 - **person_id**: PostHog 내부 사용자 ID (시스템 생성, 불변)
-- **distinct_id**: 익명/식별 사용자 ID. 로그인 전에는 익명 ID, 로그인 후 회원 ID에 매핑됨
+- **distinct_id**: 익명/식별 사용자 ID. 로그인 전에는 익명 ID, 로그인 성공(\`login_success\`) 이후부터는 학번을 SHA-256 hex 해시한 값이 \`distinct_id\`로 설정되어 사용자를 식별할 수 있음
 - **$identify 이벤트**: 익명 → 식별 사용자 병합 지점. 회원가입/로그인 시점에 발생
 
 ### 사용자 속성 (주요, 이벤트 기준)
@@ -40,19 +40,20 @@ SSU-Time(슈타임) — 숭실대학교 시간표/공강 관리 모바일 앱. �
 - \`submit_complete_click\`: 제출 완료 클릭
 
 **홈 화면 위젯**
-- \`widget_display\`: 위젯 표시
+- \`widget_display\`: 위젯 표시 (**Android 전용**)
 - \`widget_tap\` / \`widget_refresh_tap\`: 위젯 탭/새로고침
 - \`widget_banner_click\` / \`widget_banner_confirm\` / \`widget_banner_dismiss\`: 위젯 배너 상호작용
 
 **알림**
 - \`notification_received\` / \`notification_tap\`: 일반 푸시 알림
-- \`call_alert_received\` / \`call_alert_accept\` / \`call_alert_reject\`: 전화 알림 (공강 알림)
-- \`alarm_permission\`: 알람 권한 요청
-- \`setting_system_alarm\` / \`setting_call_alarm\`: 알람 설정 화면 진입
+- \`call_alert_received\` / \`call_alert_accept\` / \`call_alert_reject\`: 전화 알림 — 공강 알림 (**Android 전용**, iOS에는 해당 기능 없음. iOS 분석 시 제외)
+- \`call_alarm_setting\`: 통화 알람 설정 진입 (**Android 전용**). Android 온보딩 마지막 단계이며, 앱 최초 실행 시에만 발생
+- \`alarm_permission\`: 알람 권한 요청 (**iOS 온보딩 마지막 단계**, 앱 최초 실행 시에만 발생)
+- \`setting_system_alarm\` / \`setting_call_alarm\`: 알람 설정 화면 진입. \`setting_call_alarm\`은 **Android 전용**
 
 **앱스토어 / 설치**
 - \`app_store_redirect\`: 앱스토어로 이동
-- \`app_store_installed\`: 앱스토어 설치 완료
+- \`app_store_installed\`: 앱스토어 설치 완료 (**Android 전용**, iOS는 전송 안 함). UTM 파라미터(\`utm_source\`, \`utm_medium\`, \`utm_content\`)를 포함하며, 어떤 UTM 경로로 앱 설치까지 도달했는지 확인하는 용도
 - \`Application Installed\` / \`Application Opened\`: PostHog 자동 수집
 
 **새로고침**
@@ -76,7 +77,7 @@ ORDER BY date
 
 ### 비즈니스 컨텍스트
 - **시즌성**: 학기 시작(개학), 중간/기말고사, 수강신청 기간에 트래픽 폭발. 방학 중에는 급감.
-- **공강 알림(\`call_alert_*\`)**: 학기 중에만 활발. 핵심 차별화 기능.
+- **공강 알림(\`call_alert_*\`)**: Android 전용 기능. 학기 중에만 활발. 핵심 차별화 기능.
 - **위젯 설치 베이스**: 헤비 유저의 proxy 지표 (\`widget_display\` 빈도로 파악)
 - **카카오 로그인(\`kakao_click\`)**: 신규 유저의 주요 진입 경로
 - **타임존**: KST(Asia/Seoul). 쿼리 시 \`timestamp + INTERVAL 9 HOUR\` 또는 \`toTimeZone(timestamp, 'Asia/Seoul')\` 권장.
