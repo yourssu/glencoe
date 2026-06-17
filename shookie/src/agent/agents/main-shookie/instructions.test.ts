@@ -44,6 +44,14 @@ describe("main-shookie agent instructions", () => {
     expect(instructions).toContain("Code Explorer");
   });
 
+  it("routes domain knowledge updates to sequential PostHog → Code Explorer delegation", () => {
+    expect(instructions).toContain("도메인 지식 업데이트");
+    expect(instructions).toContain("순차 위임");
+    expect(instructions).toContain("7.1 도메인 지식 업데이트 워크플로우");
+    // 핵심 트리거 키워드 포함 확인
+    expect(instructions).toMatch(/기억해줘|저장해줘/);
+  });
+
   it("includes current timestamp", () => {
     expect(instructions).toMatch(/\d{4}-\d{2}-\d{2}/);
   });
