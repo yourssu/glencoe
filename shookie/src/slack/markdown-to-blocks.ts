@@ -1,7 +1,12 @@
-import type { KnownBlock } from "@slack/types";
+import type { KnownBlock, ContextActionsBlock } from "@slack/types";
+import type { ShookieBlock } from "../types/block.js";
+
+export interface ConvertOptions {
+  withFeedback?: boolean;
+}
 
 export interface ConversionResult {
-  blocks: KnownBlock[];
+  blocks: ShookieBlock[];
   fallbackText: string;
 }
 
@@ -17,14 +22,41 @@ const SECTION_TEXT_LIMIT = 3000;
 const HEADER_TEXT_LIMIT = 150;
 const MAX_BLOCKS = 50;
 
-export function convertMarkdownToBlocks(responseText: string, debugFooter: string): ConversionResult {
+export function convertMarkdownToBlocks(
+  responseText: string,
+  debugFooter: string,
+  options?: ConvertOptions,
+): ConversionResult {
   const parsed = parseMarkdown(responseText);
-  const blocks = parsedBlocksToSlackBlocks(parsed);
+  const blocks: ShookieBlock[] = parsedBlocksToSlackBlocks(parsed);
+  if (options?.withFeedback) {
+    blocks.push(buildFeedbackBlock());
+  }
   blocks.push(buildDebugContextBlock(debugFooter));
   const trimmed = enforceBlockLimit(blocks);
   const fallbackText = buildFallbackText(responseText, debugFooter);
 
   return { blocks: trimmed, fallbackText };
+}
+
+function buildFeedbackBlock(): ContextActionsBlock {
+  return {
+    type: "context_actions",
+    elements: [
+      {
+        type: "feedback_buttons",
+        action_id: "shookie_feedback",
+        positive_button: {
+          text: { type: "plain_text", text: "👍" },
+          value: "positive",
+        },
+        negative_button: {
+          text: { type: "plain_text", text: "👎" },
+          value: "negative",
+        },
+      },
+    ],
+  };
 }
 
 function parseMarkdown(text: string): ParsedBlock[] {
@@ -286,7 +318,7 @@ function splitLongCode(text: string): string[] {
   return chunks;
 }
 
-function enforceBlockLimit(blocks: KnownBlock[]): KnownBlock[] {
+function enforceBlockLimit(blocks: ShookieBlock[]): ShookieBlock[] {
   if (blocks.length <= MAX_BLOCKS) return blocks;
 
   const contextBlock = blocks[blocks.length - 1];

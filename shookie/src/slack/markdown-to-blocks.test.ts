@@ -239,4 +239,35 @@ describe("convertMarkdownToBlocks", () => {
       }
     }
   });
+
+  it("withFeedback 옵션 미지정 시 context_actions 블록 없음", () => {
+    const { blocks } = convertMarkdownToBlocks("text", "footer");
+    expect(blocks.find((b) => b.type === "context_actions")).toBeUndefined();
+  });
+
+  it("withFeedback: true일 때 context_actions 블록 추가", () => {
+    const { blocks } = convertMarkdownToBlocks("text", "footer", { withFeedback: true });
+    const feedbackBlock = blocks.find((b) => b.type === "context_actions");
+    expect(feedbackBlock).toBeDefined();
+  });
+
+  it("context_actions가 debug context 블록보다 앞에 위치", () => {
+    const { blocks } = convertMarkdownToBlocks("text", "footer", { withFeedback: true });
+    const feedbackIdx = blocks.findIndex((b) => b.type === "context_actions");
+    const contextIdx = blocks.findIndex((b) => b.type === "context");
+    expect(feedbackIdx).toBeGreaterThan(-1);
+    expect(contextIdx).toBeGreaterThan(-1);
+    expect(feedbackIdx).toBeLessThan(contextIdx);
+  });
+
+  it("feedback_buttons에 positive/negative 버튼 모두 포함", () => {
+    const { blocks } = convertMarkdownToBlocks("text", "footer", { withFeedback: true });
+    const feedbackBlock = blocks.find((b) => b.type === "context_actions") as
+      | { type: string; elements: Array<{ type: string; positive_button?: unknown; negative_button?: unknown }> }
+      | undefined;
+    expect(feedbackBlock).toBeDefined();
+    expect(feedbackBlock!.elements[0].type).toBe("feedback_buttons");
+    expect(feedbackBlock!.elements[0].positive_button).toBeDefined();
+    expect(feedbackBlock!.elements[0].negative_button).toBeDefined();
+  });
 });
