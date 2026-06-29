@@ -165,4 +165,48 @@ describe("convertMarkdownToBlocks", () => {
       expect(text.text).not.toContain("**SSUTime-Prod**");
     }
   });
+
+  it("converts __bold__ to Slack *bold*", () => {
+    const markdown = "__중요__ 안내입니다.";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toContain("*중요*");
+      expect(text.text).not.toContain("__중요__");
+    }
+  });
+
+  it("converts ~~strike~~ to Slack ~strike~", () => {
+    const markdown = "~~취소됨~~ 항목입니다.";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toContain("~취소됨~");
+      expect(text.text).not.toContain("~~취소됨~~");
+    }
+  });
+
+  it("preserves ** inside code blocks (no mrkdwn conversion)", () => {
+    const markdown = "```\n**not bold**\n```";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    expect(section).toBeDefined();
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      // Code block content must be preserved verbatim, including the double **
+      expect(text.text).toBe("```\n**not bold**\n```");
+    }
+  });
+
+  it("wraps code blocks with ``` fences in output", () => {
+    const markdown = "```\nconst x = 1;\n```";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toMatch(/```[\s\S]*const x = 1;[\s\S]*```/);
+    }
+  });
 });

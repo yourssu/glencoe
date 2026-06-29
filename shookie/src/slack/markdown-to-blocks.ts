@@ -10,6 +10,7 @@ type ParsedBlock =
   | { type: "heading3"; text: string }
   | { type: "divider" }
   | { type: "table"; headerRow: string[]; rows: string[][] }
+  | { type: "code"; text: string }
   | { type: "paragraph"; text: string };
 
 const SECTION_TEXT_LIMIT = 3000;
@@ -32,6 +33,7 @@ function parseMarkdown(text: string): ParsedBlock[] {
 
   let currentParagraph: string[] = [];
   let currentTable: string[][] = [];
+  let currentCode: string[] = [];
   let inCodeBlock = false;
   let inTable = false;
 
@@ -55,23 +57,32 @@ function parseMarkdown(text: string): ParsedBlock[] {
     inTable = false;
   }
 
+  function flushCode() {
+    if (currentCode.length === 0) return;
+    const joined = currentCode.join("\n");
+    if (joined) {
+      result.push({ type: "code", text: joined });
+    }
+    currentCode = [];
+  }
+
   for (const line of lines) {
-    // Code block tracking
+    // Code block tracking — the ``` fence lines themselves are NOT included
+    // in the stored text; we re-wrap with ``` at render time.
     if (line.trimStart().startsWith("```")) {
       if (inCodeBlock) {
-        currentParagraph.push(line);
         inCodeBlock = false;
+        flushCode();
         continue;
       }
       flushParagraph();
       flushTable();
-      currentParagraph.push(line);
       inCodeBlock = true;
       continue;
     }
 
     if (inCodeBlock) {
-      currentParagraph.push(line);
+      currentCode.push(line);
       continue;
     }
 
@@ -124,6 +135,10 @@ function parseMarkdown(text: string): ParsedBlock[] {
 
   flushParagraph();
   flushTable();
+  if (inCodeBlock) {
+    // Unterminated code block — flush as-is
+    flushCode();
+  }
 
   return result;
 }
@@ -155,6 +170,17 @@ function parsedBlocksToSlackBlocks(parsed: ParsedBlock[]): KnownBlock[] {
       }
       case "divider": {
         blocks.push({ type: "divider" });
+        break;
+      }
+      case "code": {
+        // Re-wrap each chunk in ``` so Slack renders it as a code block.
+        // Do NOT apply toSlackMrkdwn — would mangle ** inside code.
+        for (const chunk of splitLongCode(block.text)) {
+          blocks.push({
+            type: "section",
+            text: { type: "mrkdwn", text: "```\n" + chunk + "\n```" },
+          });
+        }
         break;
       }
       case "table": {
@@ -236,6 +262,30 @@ function splitLongText(text: string): string[] {
   return chunks;
 }
 
+function splitLongCode(text: string): string[] {
+  // Caller wraps each chunk in ``` fences, so leave room for them (~8 chars).
+  const effectiveLimit = SECTION_TEXT_LIMIT - 8;
+  if (text.length <= effectiveLimit) return [text];
+
+  const chunks: string[] = [];
+  const lines = text.split("\n");
+  let current: string[] = [];
+
+  for (const line of lines) {
+    const candidateLen = current.join("\n").length + line.length + 1;
+    if (candidateLen > effectiveLimit && current.length > 0) {
+      chunks.push(current.join("\n"));
+      current = [];
+    }
+    current.push(line);
+  }
+
+  if (current.length > 0) {
+    chunks.push(current.join("\n"));
+  }
+  return chunks;
+}
+
 function enforceBlockLimit(blocks: KnownBlock[]): KnownBlock[] {
   if (blocks.length <= MAX_BLOCKS) return blocks;
 
@@ -262,6 +312,10 @@ function stripMarkdownBold(text: string): string {
 }
 
 function toSlackMrkdwn(text: string): string {
-  // Convert standard markdown **bold** to Slack mrkdwn *bold*
-  return text.replace(/\*\*(.+?)\*\*/g, "*$1*");
+  // Convert standard markdown to Slack mrkdwn. Single-asterisk/underscore/tilde
+  // forms are already valid Slack mrkdwn, so we only need to collapse doubles.
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "*$1*") // **bold** → *bold*
+    .replace(/__(.+?)__/g, "*$1*")      // __bold__ → *bold* (Slack has no underline)
+    .replace(/~~(.+?)~~/g, "~$1~");     // ~~strike~~ → ~strike~
 }
