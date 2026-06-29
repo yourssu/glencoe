@@ -35,8 +35,9 @@ let preferredSchema: "flat" | "nested" | null = null;
  * chat.startStream 호출로 plan 표시 모드 스트림을 시작.
  * Bolt 4.x WebClient에 타입된 메서드가 없어 apiCall로 직접 호출.
  *
- * team_id: org-level 설치나 특정 토큰 타입에서 missing_recipient_team_id
- * 에러 방지. 이벤트 페이로드의 team 필드에서 추출해 전달.
+ * team_id 파라미터명이 문서화되어 있지 않지만 실제로는 team_id로는
+ * 부족하고 recipient_team_id가 필요함 (Slack Connect 계열 API 규칙).
+ * team_id 시도 → missing_recipient_team_id 에러 시 recipient_team_id로 폴백.
  *
  * 실패 시 예외 throw — 호출부에서 폴백(chat.postMessage) 처리.
  */
@@ -46,11 +47,45 @@ export async function startPlanStream(
   threadTs: string,
   teamId?: string,
 ): Promise<StreamSession> {
-  const res = (await client.apiCall("chat.startStream", {
+  const baseArgs = {
     channel,
     thread_ts: threadTs,
     task_display_mode: "plan",
-    ...(teamId ? { team_id: teamId } : {}),
+  };
+
+  // 1차: team_id
+  if (teamId) {
+    try {
+      const res = (await client.apiCall("chat.startStream", {
+        ...baseArgs,
+        team_id: teamId,
+      })) as StreamResponse;
+      if (res.ok && res.ts) {
+        return { channel, messageTs: res.ts, threadTs };
+      }
+      // missing_recipient_team_id 외 에러는 그대로 throw
+      if (res.error !== "missing_recipient_team_id") {
+        throw new Error(`chat.startStream failed: ${res.error ?? "unknown"}`);
+      }
+      logger.warn(
+        `[${logTag}] team_id 거부됨, recipient_team_id로 재시도`,
+      );
+    } catch (err) {
+      // missing_recipient_team_id 아니면 그대로 throw
+      if (err instanceof Error && !err.message.includes("missing_recipient_team_id")) {
+        throw err;
+      }
+      logger.warn(
+        `[${logTag}] team_id 예외, recipient_team_id로 재시도:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  // 2차: recipient_team_id (Slack Connect 계열 파라미터명)
+  const res = (await client.apiCall("chat.startStream", {
+    ...baseArgs,
+    ...(teamId ? { recipient_team_id: teamId } : {}),
   })) as StreamResponse;
 
   if (!res.ok || !res.ts) {
