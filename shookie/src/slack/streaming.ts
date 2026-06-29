@@ -15,7 +15,8 @@ export interface TaskChunk {
   id: string;
   title: string;
   status: TaskStatus;
-  details?: string;
+  details?: string;  // 요약 — 최대 256자
+  output?: string;   // 결과 본문 — rich_text로 감싸져 전송, 최대 ~3000자
 }
 
 interface StreamResponse {
@@ -121,6 +122,22 @@ async function sendChunk(
     thread_ts: session.threadTs,
   };
 
+  // output 필드는 rich_text 객체로 감싸서 전송 (Slack 스펙).
+  // details는 string 그대로.
+  const outputRichText = chunk.output
+    ? {
+        output: {
+          type: "rich_text" as const,
+          elements: [
+            {
+              type: "rich_text_section" as const,
+              elements: [{ type: "text" as const, text: chunk.output }],
+            },
+          ],
+        },
+      }
+    : {};
+
   const taskChunk =
     schema === "flat"
       ? {
@@ -129,6 +146,7 @@ async function sendChunk(
           title: chunk.title,
           status: chunk.status,
           ...(chunk.details ? { details: chunk.details } : {}),
+          ...outputRichText,
         }
       : {
           type: "task_update" as const,
@@ -137,6 +155,7 @@ async function sendChunk(
             title: chunk.title,
             status: chunk.status,
             ...(chunk.details ? { details: chunk.details } : {}),
+            ...outputRichText,
           },
         };
 

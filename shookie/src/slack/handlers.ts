@@ -189,17 +189,33 @@ async function handleConversation(
             }
           } else if (value.type === "tool-result") {
             const payload = (value as {
-              payload: { toolName: string; id?: string; toolCallId?: string };
+              payload: {
+                toolName: string;
+                id?: string;
+                toolCallId?: string;
+                result?: unknown;
+              };
             }).payload;
             const toolName = payload.toolName;
             const taskId = payload.id ?? payload.toolCallId;
 
             if (streamSession && taskId) {
+              // output 필드로 긴 결과 본문 전송 (rich_text, ~3000자).
+              // 도구 결과가 JSON/문자열 혼합이라 문자열로 정규화 후 슬라이스.
+              const rawResult = payload.result;
+              const resultStr = rawResult
+                ? (typeof rawResult === "string"
+                    ? rawResult
+                    : JSON.stringify(rawResult)
+                  ).slice(0, 2000)
+                : undefined;
+
               try {
                 await appendTaskUpdate(streamSession, app.client, {
                   id: taskId,
                   title: TOOL_PROGRESS_MESSAGES[toolName] ?? toolName,
                   status: "complete",
+                  ...(resultStr ? { output: resultStr } : {}),
                 });
               } catch (err) {
                 logger.warn(

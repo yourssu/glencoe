@@ -125,6 +125,30 @@ describe("appendTaskUpdate", () => {
       .apiCall.mock.calls[0][1] as { chunks: Array<Record<string, unknown>> };
     expect(args.chunks[0].details).toBe("요약");
   });
+
+  it("output이 있으면 chunk에 rich_text 형태로 output 필드 포함", async () => {
+    const { appendTaskUpdate } = await import("./streaming.js");
+    const client = createMockClient([{ ok: true }]);
+
+    await appendTaskUpdate(SESSION, client, {
+      id: "task_1",
+      title: "Test",
+      status: "complete",
+      output: "결과 본문 텍스트",
+    });
+
+    const args = (client as unknown as { apiCall: { mock: { calls: unknown[][] } } })
+      .apiCall.mock.calls[0][1] as { chunks: Array<Record<string, unknown>> };
+    expect(args.chunks[0].output).toEqual({
+      type: "rich_text",
+      elements: [
+        {
+          type: "rich_text_section",
+          elements: [{ type: "text", text: "결과 본문 텍스트" }],
+        },
+      ],
+    });
+  });
 });
 
 describe("startPlanStream", () => {
