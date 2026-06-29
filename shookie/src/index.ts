@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { setLogLevel, logger } from "./logger.js";
 import { createAgent } from "./agent/index.js";
 import { registerHandlers } from "./slack/handlers.js";
+import { registerAssistantHandlers } from "./slack/assistant.js";
 import { closePool } from "database";
 
 async function main() {
@@ -22,6 +23,7 @@ async function main() {
 
   // 4. 핸들러 등록
   registerHandlers(app, agent);
+  registerAssistantHandlers(app);
 
   // 5. 시작
   await app.start();
