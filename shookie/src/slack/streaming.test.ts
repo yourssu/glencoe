@@ -126,7 +126,7 @@ describe("appendTaskUpdate", () => {
     expect(args.chunks[0].details).toBe("요약");
   });
 
-  it("output이 있으면 chunk에 rich_text 형태로 output 필드 포함", async () => {
+  it("output이 있으면 chunk에 output 필드 포함 (string)", async () => {
     const { appendTaskUpdate } = await import("./streaming.js");
     const client = createMockClient([{ ok: true }]);
 
@@ -139,15 +139,8 @@ describe("appendTaskUpdate", () => {
 
     const args = (client as unknown as { apiCall: { mock: { calls: unknown[][] } } })
       .apiCall.mock.calls[0][1] as { chunks: Array<Record<string, unknown>> };
-    expect(args.chunks[0].output).toEqual({
-      type: "rich_text",
-      elements: [
-        {
-          type: "rich_text_section",
-          elements: [{ type: "text", text: "결과 본문 텍스트" }],
-        },
-      ],
-    });
+    // chunk의 output은 string (task_card block과 다름)
+    expect(args.chunks[0].output).toBe("결과 본문 텍스트");
   });
 });
 
