@@ -257,10 +257,17 @@ async function handleConversation(
     const outputTokens = usage?.outputTokens ?? 0;
 
     logger.info(`📤 응답 전송: "${responseText.slice(0, 150)}..."`);
-    logger.debug("result.usage:", JSON.stringify(usage));
-    logger.debug("result.steps count:", steps.length);
-    logger.debug("result.text length:", responseText.length);
-    logger.debug("result.finishReason:", finishReason);
+    // 진단용 INFO 한 줄 — 잘림 원인 파악 (LOG_LEVEL=info에서도 보임)
+    // finishReason=length → LLM 토큰 한도, =steps → maxSteps 도달, =stop → 정상, =error → 예외
+    const finishReasonLabel = typeof finishReason === "string" ? finishReason : String(finishReason ?? "?");
+    logger.info(
+      `[diagnostic] finishReason=${finishReasonLabel} steps=${steps.length} textLen=${responseText.length} inputTokens=${inputTokens} outputTokens=${outputTokens}`,
+    );
+    if (finishReasonLabel === "length" || finishReasonLabel === "steps") {
+      logger.warn(
+        `[diagnostic] 응답이 ${finishReasonLabel === "length" ? "LLM 토큰 한도(length)" : "maxSteps 도달(steps)"}로 잘렸을 수 있음`,
+      );
+    }
 
     for (const [i, step] of steps.entries()) {
       logger.debug(`--- step[${i}] ---`);
