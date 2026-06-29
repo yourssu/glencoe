@@ -314,8 +314,17 @@ function stripMarkdownBold(text: string): string {
 function toSlackMrkdwn(text: string): string {
   // Convert standard markdown to Slack mrkdwn. Single-asterisk/underscore/tilde
   // forms are already valid Slack mrkdwn, so we only need to collapse doubles.
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "*$1*") // **bold** → *bold*
-    .replace(/__(.+?)__/g, "*$1*")      // __bold__ → *bold* (Slack has no underline)
-    .replace(/~~(.+?)~~/g, "~$1~");     // ~~strike~~ → ~strike~
+  // Inline code spans (`...`) are preserved verbatim — Slack does not interpret
+  // mrkdwn inside them, so we must not mangle ** inside.
+  const parts = text.split(/(`[^`]+`)/g);
+  return parts
+    .map((part) => {
+      const isInlineCode = part.length >= 2 && part.startsWith("`") && part.endsWith("`");
+      if (isInlineCode) return part;
+      return part
+        .replace(/\*\*(.+?)\*\*/g, "*$1*") // **bold** → *bold*
+        .replace(/__(.+?)__/g, "*$1*")      // __bold__ → *bold* (Slack has no underline)
+        .replace(/~~(.+?)~~/g, "~$1~");     // ~~strike~~ → ~strike~
+    })
+    .join("");
 }

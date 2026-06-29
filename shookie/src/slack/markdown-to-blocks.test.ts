@@ -209,4 +209,34 @@ describe("convertMarkdownToBlocks", () => {
       expect(text.text).toMatch(/```[\s\S]*const x = 1;[\s\S]*```/);
     }
   });
+
+  it("preserves ** inside inline code spans", () => {
+    const markdown = "실행하려면 `**flag**` 값을 바꾸세요.";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toContain("`**flag**`");
+      expect(text.text).not.toContain("`*flag*`");
+    }
+  });
+
+  it("splits long code blocks into multiple sections with balanced ``` fences", () => {
+    const longLine = "x".repeat(2000);
+    const markdown = "```\n" + longLine + "\n" + longLine + "\n```";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const codeSections = blocks.filter((b) => {
+      if (b.type !== "section" || !("text" in b)) return false;
+      const text = (b.text as { text: string }).text;
+      return text.includes("```");
+    });
+    expect(codeSections.length).toBeGreaterThan(1);
+    for (const s of codeSections) {
+      if (s.type === "section" && "text" in s) {
+        const text = (s.text as { text: string }).text;
+        const fenceCount = (text.match(/```/g) ?? []).length;
+        expect(fenceCount).toBe(2); // each chunk must open AND close its own code block
+      }
+    }
+  });
 });
