@@ -123,8 +123,8 @@ async function handleConversation(
 
     // Slack plan 스트림 열기 (실패 시 폴백: 이후 도구/최종 응답은 chat.postMessage로)
     try {
-      logger.info(`[streaming] startPlanStream 호출: channel=${channel} threadTs=${threadTs} teamId=${teamId ?? "(없음)"}`);
-      streamSession = await startPlanStream(app.client, channel, threadTs, teamId);
+      logger.info(`[streaming] startPlanStream 호출: channel=${channel} threadTs=${threadTs} teamId=${teamId ?? "(없음)"} userId=${userId}`);
+      streamSession = await startPlanStream(app.client, channel, threadTs, teamId, userId);
       logger.info(`[streaming] plan 스트림 열림: ts=${streamSession.messageTs}`);
     } catch (err) {
       logger.warn(
