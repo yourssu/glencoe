@@ -35,17 +35,22 @@ let preferredSchema: "flat" | "nested" | null = null;
  * chat.startStream 호출로 plan 표시 모드 스트림을 시작.
  * Bolt 4.x WebClient에 타입된 메서드가 없어 apiCall로 직접 호출.
  *
+ * team_id: org-level 설치나 특정 토큰 타입에서 missing_recipient_team_id
+ * 에러 방지. 이벤트 페이로드의 team 필드에서 추출해 전달.
+ *
  * 실패 시 예외 throw — 호출부에서 폴백(chat.postMessage) 처리.
  */
 export async function startPlanStream(
   client: WebClient,
   channel: string,
   threadTs: string,
+  teamId?: string,
 ): Promise<StreamSession> {
   const res = (await client.apiCall("chat.startStream", {
     channel,
     thread_ts: threadTs,
     task_display_mode: "plan",
+    ...(teamId ? { team_id: teamId } : {}),
   })) as StreamResponse;
 
   if (!res.ok || !res.ts) {

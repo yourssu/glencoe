@@ -66,7 +66,8 @@ export function registerHandlers(app: App, agent: Agent): void {
       return;
     }
 
-    await handleConversation(app, agent, text, event.channel, event.thread_ts ?? event.ts, event.user ?? "unknown");
+    const team = (event as { team?: string }).team;
+    await handleConversation(app, agent, text, event.channel, event.thread_ts ?? event.ts, event.user ?? "unknown", team);
   });
 
   app.event("message", async ({ event, client }) => {
@@ -76,8 +77,8 @@ export function registerHandlers(app: App, agent: Agent): void {
     const text = extractText((event as { text?: string }).text);
     if (!text) return;
 
-    const msgEvent = event as { channel: string; thread_ts?: string; ts: string; user?: string };
-    await handleConversation(app, agent, text, msgEvent.channel, msgEvent.thread_ts ?? msgEvent.ts, msgEvent.user ?? "unknown");
+    const msgEvent = event as { channel: string; thread_ts?: string; ts: string; user?: string; team?: string };
+    await handleConversation(app, agent, text, msgEvent.channel, msgEvent.thread_ts ?? msgEvent.ts, msgEvent.user ?? "unknown", msgEvent.team);
   });
 }
 
@@ -88,6 +89,7 @@ async function handleConversation(
   channel: string,
   threadTs: string,
   userId: string,
+  teamId?: string,
 ): Promise<void> {
   const sessionId = buildSessionId(channel, threadTs);
   let mainInvocationId: number | null = null;
@@ -121,7 +123,7 @@ async function handleConversation(
 
     // Slack plan 스트림 열기 (실패 시 폴백: 이후 도구/최종 응답은 chat.postMessage로)
     try {
-      streamSession = await startPlanStream(app.client, channel, threadTs);
+      streamSession = await startPlanStream(app.client, channel, threadTs, teamId);
       logger.info(`[streaming] plan 스트림 열림: ts=${streamSession.messageTs}`);
     } catch (err) {
       logger.warn(
