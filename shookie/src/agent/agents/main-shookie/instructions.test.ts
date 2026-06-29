@@ -36,6 +36,11 @@ describe("main-shookie agent instructions", () => {
     expect(instructions).toContain("3회 이상");
   });
 
+  it("forbids echoing user messages at response start", () => {
+    expect(instructions).toContain("사용자 메시지 반복 금지");
+    expect(instructions).toContain("곧바로 본론");
+  });
+
   it("lists PostHog in domain catalog", () => {
     expect(instructions).toContain("PostHog Analyst");
   });
