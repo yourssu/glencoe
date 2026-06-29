@@ -4,6 +4,13 @@ import { RequestContext } from "@mastra/core/request-context";
 import { InMemoryConversationStore, type Message } from "../services/memory/in-memory.js";
 import { buildSessionId, extractText } from "./thread-context.js";
 import { convertMarkdownToBlocks } from "./markdown-to-blocks.js";
+import {
+  startPlanStream,
+  appendTaskUpdate,
+  stopStreamWithBlocks,
+  type StreamSession,
+} from "./streaming.js";
+import { getCurrentChannel } from "./assistant.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { ensureThreadCapacity } from "../tools/code-explorer/workspace-manager.js";
@@ -63,6 +70,7 @@ async function handleConversation(
 ): Promise<void> {
   const sessionId = buildSessionId(channel, threadTs);
   let mainInvocationId: number | null = null;
+  let streamSession: StreamSession | null = null;
 
   try {
     logger.info(`📩 메시지 수신: "${userText.slice(0, 100)}"`);
@@ -72,7 +80,13 @@ async function handleConversation(
     store.add(sessionId, { role: "user", content: userText });
 
     const history = store.buildMessages(sessionId);
-    const prompt = history.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n");
+    const currentChannel = getCurrentChannel(threadTs);
+    const channelContextPrefix = currentChannel
+      ? `[사용자가 현재 보고 있는 채널 ID: ${currentChannel}]\n\n`
+      : "";
+    const prompt =
+      channelContextPrefix +
+      history.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n");
 
     const callCtx = await startAgentCall({ userId, channel, threadTs, question: userText });
     mainInvocationId = callCtx
@@ -83,6 +97,18 @@ async function handleConversation(
           task: userText,
         })
       : null;
+
+    // Slack plan 스트림 열기 (실패 시 폴백: 이후 도구/최종 응답은 chat.postMessage로)
+    try {
+      streamSession = await startPlanStream(app.client, channel, threadTs);
+      logger.info(`[streaming] plan 스트림 열림: ts=${streamSession.messageTs}`);
+    } catch (err) {
+      logger.warn(
+        "[streaming] startPlanStream 실패, postMessage 폴백 모드:",
+        err instanceof Error ? err.message : String(err),
+      );
+      streamSession = null;
+    }
 
     const runConversation = async () => {
       logger.info("🤖 응답 스트리밍 시작...");
@@ -96,7 +122,6 @@ async function handleConversation(
       });
 
       const toolNamesSeen: string[] = [];
-      const sentProgressMessages = new Set<string>();
 
       const reader = streamResult.fullStream.getReader();
       try {
@@ -105,19 +130,55 @@ async function handleConversation(
           if (done) break;
 
           if (value.type === "tool-call") {
-            const toolName = (value as { payload: { toolName: string } }).payload.toolName;
+            const payload = (value as {
+              payload: { toolName: string; id?: string; toolCallId?: string; args?: unknown };
+            }).payload;
+            const toolName = payload.toolName;
+            const taskId =
+              payload.id ?? payload.toolCallId ?? `tool_${toolName}_${Date.now()}`;
             if (!toolNamesSeen.includes(toolName)) {
               toolNamesSeen.push(toolName);
             }
 
-            const progressMsg = TOOL_PROGRESS_MESSAGES[toolName];
-            if (progressMsg && !sentProgressMessages.has(toolName)) {
-              sentProgressMessages.add(toolName);
-              await app.client.chat.postMessage({
-                channel,
-                thread_ts: threadTs,
-                text: progressMsg,
-              });
+            if (streamSession) {
+              const argsSummary = payload.args
+                ? JSON.stringify(payload.args).slice(0, 200)
+                : undefined;
+              try {
+                await appendTaskUpdate(streamSession, app.client, {
+                  id: taskId,
+                  title: TOOL_PROGRESS_MESSAGES[toolName] ?? toolName,
+                  status: "in_progress",
+                  details: argsSummary,
+                });
+              } catch (err) {
+                logger.warn(
+                  `[streaming] appendTaskUpdate(in_progress) 실패 (${toolName}):`,
+                  err instanceof Error ? err.message : String(err),
+                );
+              }
+            }
+          } else if (value.type === "tool-result") {
+            const payload = (value as {
+              payload: { toolName: string; id?: string; toolCallId?: string };
+            }).payload;
+            const toolName = payload.toolName;
+            const taskId =
+              payload.id ?? payload.toolCallId ?? `tool_${toolName}_${Date.now()}`;
+
+            if (streamSession) {
+              try {
+                await appendTaskUpdate(streamSession, app.client, {
+                  id: taskId,
+                  title: TOOL_PROGRESS_MESSAGES[toolName] ?? toolName,
+                  status: "complete",
+                });
+              } catch (err) {
+                logger.warn(
+                  `[streaming] appendTaskUpdate(complete) 실패 (${toolName}):`,
+                  err instanceof Error ? err.message : String(err),
+                );
+              }
             }
           }
         }
@@ -226,16 +287,36 @@ async function handleConversation(
       `💵 비용: $${((inputTokens * 0.435 + outputTokens * 0.87) / 1_000_000).toFixed(4)}`,
     ].join("\n");
 
-    const { blocks, fallbackText } = convertMarkdownToBlocks(responseText, debugFooter);
+    const { blocks, fallbackText } = convertMarkdownToBlocks(responseText, debugFooter, {
+      withFeedback: true,
+    });
 
     store.add(sessionId, { role: "assistant", content: responseText });
 
-    await app.client.chat.postMessage({
-      channel,
-      thread_ts: threadTs,
-      text: fallbackText,
-      blocks,
-    });
+    if (streamSession) {
+      try {
+        await stopStreamWithBlocks(streamSession, app.client, fallbackText, blocks);
+      } catch (err) {
+        logger.warn(
+          "[streaming] stopStreamWithBlocks 실패, postMessage로 폴백:",
+          err instanceof Error ? err.message : String(err),
+        );
+        await app.client.chat.postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: fallbackText,
+          blocks,
+        });
+      }
+    } else {
+      // 폴백 모드 (startPlanStream 실패)
+      await app.client.chat.postMessage({
+        channel,
+        thread_ts: threadTs,
+        text: fallbackText,
+        blocks,
+      });
+    }
   } catch (error) {
     logger.error("Error processing message:", error);
     if (error instanceof Error) {
@@ -252,10 +333,23 @@ async function handleConversation(
         finishReason: "error",
       });
     }
-    await app.client.chat.postMessage({
-      channel,
-      thread_ts: threadTs,
-      text: "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-    });
+    const errorText = "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    if (streamSession) {
+      try {
+        await stopStreamWithBlocks(streamSession, app.client, errorText, []);
+      } catch {
+        await app.client.chat.postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: errorText,
+        });
+      }
+    } else {
+      await app.client.chat.postMessage({
+        channel,
+        thread_ts: threadTs,
+        text: errorText,
+      });
+    }
   }
 }
