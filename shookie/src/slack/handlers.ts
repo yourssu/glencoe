@@ -1,4 +1,5 @@
 import type { App } from "@slack/bolt";
+import type { KnownBlock } from "@slack/types";
 import type { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
 import { InMemoryConversationStore, type Message } from "../services/memory/in-memory.js";
@@ -11,6 +12,7 @@ import {
   type StreamSession,
 } from "./streaming.js";
 import { getCurrentChannel } from "./assistant.js";
+import type { ShookieBlock } from "../types/block.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { ensureThreadCapacity } from "../tools/code-explorer/workspace-manager.js";
@@ -30,6 +32,25 @@ const TOOL_PROGRESS_MESSAGES: Record<string, string> = {
   posthog_agent: "🔍 PostHog 데이터 분석 중...",
   code_explorer_agent: "🔬 코드 탐색 중...",
 };
+
+/**
+ * chat.postMessage 래퍼 — 스트리밍 실패 시 폴백 등 여러 곳에서 중복 사용.
+ * ShookieBlock[]은 context_actions를 포함할 수 있어 KnownBlock[]로 캐스팅.
+ */
+async function postToThread(
+  app: App,
+  channel: string,
+  threadTs: string,
+  text: string,
+  blocks?: ShookieBlock[],
+): Promise<void> {
+  await app.client.chat.postMessage({
+    channel,
+    thread_ts: threadTs,
+    text,
+    ...(blocks ? { blocks: blocks as KnownBlock[] } : {}),
+  });
+}
 
 export function registerHandlers(app: App, agent: Agent): void {
   app.event("app_mention", async ({ event, client }) => {
@@ -134,13 +155,14 @@ async function handleConversation(
               payload: { toolName: string; id?: string; toolCallId?: string; args?: unknown };
             }).payload;
             const toolName = payload.toolName;
-            const taskId =
-              payload.id ?? payload.toolCallId ?? `tool_${toolName}_${Date.now()}`;
+            // tool-call과 tool-result가 같은 taskId로 매핑되려면 안정적 ID 필수.
+            // Date.now() fallback은 두 이벤트가 다른 ID를 만들어 plan 블록이 깨짐.
+            const taskId = payload.id ?? payload.toolCallId;
             if (!toolNamesSeen.includes(toolName)) {
               toolNamesSeen.push(toolName);
             }
 
-            if (streamSession) {
+            if (streamSession && taskId) {
               const argsSummary = payload.args
                 ? JSON.stringify(payload.args).slice(0, 200)
                 : undefined;
@@ -157,16 +179,19 @@ async function handleConversation(
                   err instanceof Error ? err.message : String(err),
                 );
               }
+            } else if (streamSession && !taskId) {
+              logger.warn(
+                `[streaming] tool-call 이벤트에 id/toolCallId 없음 — task_update 스킵 (${toolName})`,
+              );
             }
           } else if (value.type === "tool-result") {
             const payload = (value as {
               payload: { toolName: string; id?: string; toolCallId?: string };
             }).payload;
             const toolName = payload.toolName;
-            const taskId =
-              payload.id ?? payload.toolCallId ?? `tool_${toolName}_${Date.now()}`;
+            const taskId = payload.id ?? payload.toolCallId;
 
-            if (streamSession) {
+            if (streamSession && taskId) {
               try {
                 await appendTaskUpdate(streamSession, app.client, {
                   id: taskId,
@@ -179,6 +204,10 @@ async function handleConversation(
                   err instanceof Error ? err.message : String(err),
                 );
               }
+            } else if (streamSession && !taskId) {
+              logger.warn(
+                `[streaming] tool-result 이벤트에 id/toolCallId 없음 — task_update 스킵 (${toolName})`,
+              );
             }
           }
         }
@@ -301,21 +330,11 @@ async function handleConversation(
           "[streaming] stopStreamWithBlocks 실패, postMessage로 폴백:",
           err instanceof Error ? err.message : String(err),
         );
-        await app.client.chat.postMessage({
-          channel,
-          thread_ts: threadTs,
-          text: fallbackText,
-          blocks,
-        });
+        await postToThread(app, channel, threadTs, fallbackText, blocks);
       }
     } else {
       // 폴백 모드 (startPlanStream 실패)
-      await app.client.chat.postMessage({
-        channel,
-        thread_ts: threadTs,
-        text: fallbackText,
-        blocks,
-      });
+      await postToThread(app, channel, threadTs, fallbackText, blocks);
     }
   } catch (error) {
     logger.error("Error processing message:", error);
@@ -338,18 +357,10 @@ async function handleConversation(
       try {
         await stopStreamWithBlocks(streamSession, app.client, errorText, []);
       } catch {
-        await app.client.chat.postMessage({
-          channel,
-          thread_ts: threadTs,
-          text: errorText,
-        });
+        await postToThread(app, channel, threadTs, errorText);
       }
     } else {
-      await app.client.chat.postMessage({
-        channel,
-        thread_ts: threadTs,
-        text: errorText,
-      });
+      await postToThread(app, channel, threadTs, errorText);
     }
   }
 }

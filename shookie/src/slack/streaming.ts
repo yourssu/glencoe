@@ -1,5 +1,6 @@
 import type { WebClient } from "@slack/web-api";
 import type { KnownBlock } from "@slack/types";
+import type { ShookieBlock } from "../types/block.js";
 import { logger } from "../logger.js";
 
 export interface StreamSession {
@@ -25,6 +26,10 @@ interface StreamResponse {
 }
 
 const logTag = "streaming";
+
+// task_update chunk 스키마를 한 번 성공한 것으로 고정해 재시도 낭비 방지.
+// docs에 3가지 형태가 섞여 있어 첫 호출에서 확정.
+let preferredSchema: "flat" | "nested" | null = null;
 
 /**
  * chat.startStream 호출로 plan 표시 모드 스트림을 시작.
@@ -54,13 +59,52 @@ export async function startPlanStream(
  * chat.appendStream으로 task_update chunk 전송.
  * 도구 시작/완료 시각을 plan 블록에 반영.
  *
- * chunk 스키마: docs에 3가지 형태가 섞여 있어 평면 형태 우선,
- * 실패 시 중첩 형태로 폴백. 어느 쪽이 실제 동작하는지 런타임에 확정됨.
+ * chunk 스키마는 첫 호출에서 확정되어 preferredSchema에 캐싱됨.
+ * 이후 호출은 해당 스키마만 사용 — 불필요한 폴백 재시도 방지.
  */
 export async function appendTaskUpdate(
   session: StreamSession,
   client: WebClient,
   chunk: TaskChunk,
+): Promise<void> {
+  if (preferredSchema === "flat") {
+    return sendChunk(client, session, chunk, "flat");
+  }
+  if (preferredSchema === "nested") {
+    return sendChunk(client, session, chunk, "nested");
+  }
+
+  // 프로브: 평면 형태 먼저 시도
+  try {
+    await sendChunk(client, session, chunk, "flat");
+    preferredSchema = "flat";
+    logger.info(`[${logTag}] chunk 스키마 확정: flat`);
+    return;
+  } catch (err) {
+    if (!isInvalidChunksError(err)) throw err;
+    logger.warn(
+      `[${logTag}] 평면 chunk 형태 거부됨(invalid_chunks), 중첩 형태로 전환`,
+    );
+  }
+
+  // 폴백: 중첩 형태
+  await sendChunk(client, session, chunk, "nested");
+  preferredSchema = "nested";
+  logger.info(`[${logTag}] chunk 스키마 확정: nested`);
+}
+
+function isInvalidChunksError(err: unknown): boolean {
+  if (err instanceof Error) {
+    return err.message.includes("invalid_chunks");
+  }
+  return false;
+}
+
+async function sendChunk(
+  client: WebClient,
+  session: StreamSession,
+  chunk: TaskChunk,
+  schema: "flat" | "nested",
 ): Promise<void> {
   const baseArgs = {
     channel: session.channel,
@@ -68,74 +112,55 @@ export async function appendTaskUpdate(
     thread_ts: session.threadTs,
   };
 
-  // 1차 시도: 평면 형태 (appendStream 메서드 doc 기준)
-  try {
-    const res = (await client.apiCall("chat.appendStream", {
-      ...baseArgs,
-      chunks: [
-        {
-          type: "task_update",
+  const taskChunk =
+    schema === "flat"
+      ? {
+          type: "task_update" as const,
           id: chunk.id,
           title: chunk.title,
           status: chunk.status,
           ...(chunk.details ? { details: chunk.details } : {}),
-        },
-      ],
-    })) as StreamResponse;
+        }
+      : {
+          type: "task_update" as const,
+          task: {
+            task_id: chunk.id,
+            title: chunk.title,
+            status: chunk.status,
+            ...(chunk.details ? { details: chunk.details } : {}),
+          },
+        };
 
-    if (res.ok) return;
-    // invalid_chunks 가 아니면 재시도해봤자 의미 없음 — 그대로 throw
-    if (res.error !== "invalid_chunks") {
-      throw new Error(`chat.appendStream failed: ${res.error ?? "unknown"}`);
-    }
-    logger.warn(
-      `[${logTag}] 평면 chunk 형태 거부됨(invalid_chunks), 중첩 형태로 재시도`,
-    );
-  } catch (err) {
-    // apiCall 자체 예외 (네트워크 등) — 일단 중첩 형태로 재시도
-    logger.warn(
-      `[${logTag}] appendStream 평면 형태 예외, 중첩 형태로 재시도:`,
-      err instanceof Error ? err.message : String(err),
-    );
-  }
-
-  // 2차 시도: 중첩 형태 (developing-agents doc 예제 기준)
-  const res2 = (await client.apiCall("chat.appendStream", {
+  const res = (await client.apiCall("chat.appendStream", {
     ...baseArgs,
-    chunks: [
-      {
-        type: "task_update",
-        task: {
-          task_id: chunk.id,
-          title: chunk.title,
-          status: chunk.status,
-          ...(chunk.details ? { details: chunk.details } : {}),
-        },
-      },
-    ],
+    chunks: [taskChunk],
   })) as StreamResponse;
 
-  if (!res2.ok) {
-    throw new Error(`chat.appendStream failed: ${res2.error ?? "unknown"}`);
+  if (!res.ok) {
+    throw new Error(`chat.appendStream failed: ${res.error ?? "unknown"}`);
   }
 }
 
 /**
  * chat.stopStream으로 스트림 종료 + 최종 본문/블록 전송.
  * blocks는 stopStream에서만 허용됨 (startStream/appendStream은 불가).
+ *
+ * ShookieBlock 배열을 받지만 apiCall 시점에 KnownBlock[]로 캐스팅 —
+ * context_actions는 런타임에 유효하나 @slack/types@2.21의 KnownBlock
+ * union에 아직 포함되지 않았기 때문.
  */
 export async function stopStreamWithBlocks(
   session: StreamSession,
   client: WebClient,
   text: string,
-  blocks: KnownBlock[],
+  blocks: ShookieBlock[],
 ): Promise<void> {
   const res = (await client.apiCall("chat.stopStream", {
     channel: session.channel,
     ts: session.messageTs,
     thread_ts: session.threadTs,
     text,
-    blocks,
+    blocks: blocks as KnownBlock[],
   })) as StreamResponse;
 
   if (!res.ok) {

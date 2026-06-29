@@ -5,7 +5,17 @@ const logTag = "assistant";
 
 // assistant_thread_context_changed 이벤트로 수집한 "현재 사용자가 보고 있는 채널" 매핑.
 // key: threadTs, value: channelId. 서버 재시작 시 휘발됨 (MVP).
+const MAX_CHANNEL_CONTEXT = 1000;
 const channelContext = new Map<string, string>();
+
+function setChannel(threadTs: string, channelId: string): void {
+  // Map은 삽입 순서를 보존하므로, 초과 시 가장 오래된 항목부터 제거 (FIFO/LRU).
+  if (channelContext.size >= MAX_CHANNEL_CONTEXT && !channelContext.has(threadTs)) {
+    const oldest = channelContext.keys().next().value;
+    if (oldest !== undefined) channelContext.delete(oldest);
+  }
+  channelContext.set(threadTs, channelId);
+}
 
 /**
  * 특정 스레드의 현재 컨텍스트 채널 ID 반환.
@@ -33,7 +43,7 @@ export function registerAssistantHandlers(app: App): void {
   app.event("assistant_thread_context_changed", async ({ event }) => {
     const ev = event as { thread_ts?: string; channel_id?: string };
     if (ev.thread_ts && ev.channel_id) {
-      channelContext.set(ev.thread_ts, ev.channel_id);
+      setChannel(ev.thread_ts, ev.channel_id);
       logger.info(
         `[${logTag}] context changed: thread=${ev.thread_ts} → ${ev.channel_id}`,
       );

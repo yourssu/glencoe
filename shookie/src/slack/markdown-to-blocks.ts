@@ -1,11 +1,12 @@
 import type { KnownBlock, ContextActionsBlock } from "@slack/types";
+import type { ShookieBlock } from "../types/block.js";
 
 export interface ConvertOptions {
   withFeedback?: boolean;
 }
 
 export interface ConversionResult {
-  blocks: KnownBlock[];
+  blocks: ShookieBlock[];
   fallbackText: string;
 }
 
@@ -27,7 +28,7 @@ export function convertMarkdownToBlocks(
   options?: ConvertOptions,
 ): ConversionResult {
   const parsed = parseMarkdown(responseText);
-  const blocks = parsedBlocksToSlackBlocks(parsed);
+  const blocks: ShookieBlock[] = parsedBlocksToSlackBlocks(parsed);
   if (options?.withFeedback) {
     blocks.push(buildFeedbackBlock());
   }
@@ -38,8 +39,8 @@ export function convertMarkdownToBlocks(
   return { blocks: trimmed, fallbackText };
 }
 
-function buildFeedbackBlock(): KnownBlock {
-  const block: ContextActionsBlock = {
+function buildFeedbackBlock(): ContextActionsBlock {
+  return {
     type: "context_actions",
     elements: [
       {
@@ -56,7 +57,6 @@ function buildFeedbackBlock(): KnownBlock {
       },
     ],
   };
-  return block as unknown as KnownBlock;
 }
 
 function parseMarkdown(text: string): ParsedBlock[] {
@@ -318,7 +318,7 @@ function splitLongCode(text: string): string[] {
   return chunks;
 }
 
-function enforceBlockLimit(blocks: KnownBlock[]): KnownBlock[] {
+function enforceBlockLimit(blocks: ShookieBlock[]): ShookieBlock[] {
   if (blocks.length <= MAX_BLOCKS) return blocks;
 
   const contextBlock = blocks[blocks.length - 1];
