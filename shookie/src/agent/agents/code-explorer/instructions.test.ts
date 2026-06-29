@@ -34,9 +34,8 @@ describe("code-explorer agent instructions", () => {
     expect(instructions).toContain("추론/가설 금지");
   });
 
-  it("requires build verification before PR", () => {
-    expect(instructions).toContain("빌드 검증 (필수)");
-    expect(instructions).toContain("yarn workspace shookie build");
+  it("delegates build verification to CI", () => {
+    expect(instructions).toContain("빌드 검증은 CI에 위임");
   });
 
   it("includes domain-specific security guidance", () => {

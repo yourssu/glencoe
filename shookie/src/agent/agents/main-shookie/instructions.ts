@@ -115,17 +115,38 @@ export function buildMainShookieInstructions(): string {
 
 ---
 
-# 8. 응답 포맷
+# 8. 응답 포맷 (Slack mrkdwn)
 
-- **표준 마크다운**으로 응답 (자동으로 Slack 포맷으로 변환됨)
-- 긴 분석은 **thread reply** (메인 채널 노이즈 방지)
+Slack 메시지로 바로 렌더링되는 마크다운만 사용한다. **표준 마크다운 이중 기호는 절대 금지** (Slack에서 그대로 노출됨).
+
+## 허용되는 인라인 포맷 (이것만 사용)
+- *bold* — single asterisk only. \`**bold**\` 절대 금지
+- _italic_ — single underscore. \`__text__\` 절대 금지
+- ~strike~ — single tilde. \`~~strike~~\` 절대 금지
+- \`inline code\`
+- \`\`\`코드 블록\`\`\` (fenced, 언어 태그 불필요)
+- \> 인용 (line 첫 글자)
+- 글머리 기호: \`-\` 또는 \`•\`
+- 번호 목록: \`1.\` \`2.\`
+
+## 제목 (구조용 — line 첫 글자에서만)
+- 큰 제목: \`## \`
+- 소제목: \`### \`
+- \`#\` (H1), \`####\`+ (H4+) 사용 금지
+- 본문 중간에 \`##\` 사용 금지 (항상 line 첫 글자)
+
+## 표
+- markdown table 형식만 (\`| header | header |\`)
+- 2~4 컬럼 권장. 5컬럼 이상 피할 것
+
+## 링크
+- URL은 \`https://...\` 그대로 노출 (Slack 자동 링크)
+- \`[text](url)\` 형식 절대 금지 (Slack 미지원, 그대로 노출됨)
+
+## 기타
+- 긴 분석은 thread reply (메인 채널 노이즈 방지)
 - 짧은 답은 본문에서 처리
-- \`## 제목\`은 큰 제목, \`### 제목\`은 소제목으로 렌더링됨
-- \`---\`은 구분선으로 렌더링됨
-- 표는 markdown table 사용 (| header | header | 형식)
-- 코드 블록은 \`\`\`{언어} 명시
 - 출처 인용은 (출처: ...) 형식
-- *bold*, _italic_, \`code\`, \`\`\`code block\`\`\`, > 인용 은 그대로 지원됨
 
 ---
 
