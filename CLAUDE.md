@@ -55,6 +55,15 @@ yarn workspace shookie test     # 테스트
 - **모든 작업 완료 후 커밋할 변경사항이 있는지 반드시 확인하고 커밋**
 - **작업 완료 후 서버 재시작이 필요한지 반드시 안내하기** (코드 변경 시 필요, .env/문서 변경만 시 불필요)
 
+## PR / 머지 규칙
+
+- PR 머지 방식: **Squash and merge** 통일 (PR 1개 = main에 1커밋)
+- 로컬 브랜치에서는 자유롭게 커밋을 쌓아도 됨 (머지 시점에 squash)
+- PR 머지 후 로컬/원격 브랜치 즉시 정리
+  - 로컬: `git branch -D <branch>`
+  - 원격: GitHub 자동 삭제 설정, 또는 `git push origin --delete <branch>`
+- 워크트리로 생성한 브랜치는 `git worktree remove` 후 삭제
+
 ## 컨벤션
 
 - 에러 처리: 도구 실행 실패 시 사용자에게 한국어 친화적 메시지, 원본 에러 노출 금지
