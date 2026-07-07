@@ -1,11 +1,11 @@
 import type { App } from "@slack/bolt";
 import { logger } from "../logger.js";
 
-export type TeamKey = "pm" | "design" | "android" | "backend" | "frontend" | "ios" | "hr" | "legal" | "marketing" | "all";
+export type TeamKey = "pm" | "design" | "android" | "backend" | "frontend" | "ios" | "hr" | "legal" | "marketing" | "all" | "test";
 
 const ALL_TEAMS: TeamKey[] = ["pm", "design", "android", "backend", "frontend", "ios", "hr", "legal", "marketing"];
 
-const TEAM_CHANNELS: Record<TeamKey, string> = {
+const TEAM_CHANNELS: Partial<Record<TeamKey, string>> = {
   pm: "C05C46WG935",
   design: "C2SR82YCC",
   android: "CPD6BSC92",
@@ -15,17 +15,17 @@ const TEAM_CHANNELS: Record<TeamKey, string> = {
   hr: "C9SKN0VRP",
   legal: "C02HKM30AMC",
   marketing: "CPCDPFSCS",
-  all: "",
+  test: "C0ATVRN2KA6",
 };
+
+const ROUTABLE_KEYS: ReadonlySet<string> = new Set<string>([...ALL_TEAMS, "all", "test"]);
 
 const RELAY_BATCH_DELAY_MS = 250;
 
 export function routeTeam(reaction: string): TeamKey | null {
   if (!reaction.endsWith("_go")) return null;
-  const key = reaction.slice(0, -3) as TeamKey;
-  if (key === "all") return "all";
-  if ((ALL_TEAMS as string[]).includes(key)) return key;
-  return null;
+  const key = reaction.slice(0, -3);
+  return ROUTABLE_KEYS.has(key) ? (key as TeamKey) : null;
 }
 
 function delay(ms: number): Promise<void> {
@@ -79,7 +79,7 @@ async function relayToOne(
 export async function relayToAll(client: App["client"], permalink: string): Promise<void> {
   for (let i = 0; i < ALL_TEAMS.length; i++) {
     const team = ALL_TEAMS[i];
-    await relayToOne(client, team, TEAM_CHANNELS[team], permalink);
+    await relayToOne(client, team, TEAM_CHANNELS[team] as string, permalink);
     if (i < ALL_TEAMS.length - 1) {
       await delay(RELAY_BATCH_DELAY_MS);
     }
@@ -110,9 +110,9 @@ async function verifyChannelMembership(client: App["client"]): Promise<void> {
     return;
   }
 
-  for (const team of ALL_TEAMS) {
+  for (const team of Object.keys(TEAM_CHANNELS) as TeamKey[]) {
     const id = TEAM_CHANNELS[team];
-    if (!joined.has(id)) {
+    if (id && !joined.has(id)) {
       logger.warn("봇이 채널에 join 되어 있지 않음 — 전송 실패 가능", { team, channelId: id });
     }
   }
@@ -154,7 +154,7 @@ export function registerReactionRelay(app: App): void {
       if (teamKey === "all") {
         await relayToAll(client, permalink);
       } else {
-        await relayToOne(client, teamKey, TEAM_CHANNELS[teamKey], permalink);
+        await relayToOne(client, teamKey, TEAM_CHANNELS[teamKey] as string, permalink);
       }
     });
 
