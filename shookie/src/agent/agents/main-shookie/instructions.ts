@@ -118,12 +118,12 @@ export function buildMainShookieInstructions(): string {
 
 # 8. 응답 포맷 (Slack mrkdwn)
 
-Slack 메시지로 바로 렌더링되는 마크다운만 사용한다. **표준 마크다운 이중 기호는 절대 금지** (Slack에서 그대로 노출됨).
+Slack 메시지로 바로 렌더링되는 마크다운만 사용한다. 이중 기호(\`**\`, \`__\`, \`~~\`)는 후처리 과정에서 Slack mrkdwn 단일 기호로 자동 변환되므로 사용 가능하다.
 
 ## 허용되는 인라인 포맷 (이것만 사용)
-- *bold* — single asterisk only. \`**bold**\` 절대 금지
-- _italic_ — single underscore. \`__text__\` 절대 금지
-- ~strike~ — single tilde. \`~~strike~~\` 절대 금지
+- **bold** — double asterisk 사용. ★ 닫는 \`**\` 바로 뒤에 한글·CJK 문자(한글, 한자, 일본어 등)가 붙지 않도록 주의할 것. Slack mrkdwn 파서는 \`*\` bold delimiter를 word boundary(\`\b\`) 기준으로 인식하는데, CJK 문자는 word character에 포함되지 않아 \`*3위*야\` 같은 패턴이 bold로 렌더링되지 않는다. 올바른 예: \`**3위** 야\`, \`**안녕** 하세요\` (닫는 \`**\` 뒤에 공백 삽입)
+- _italic_ — single underscore. \`__text__\`도 사용 가능
+- ~~strike~~ — double tilde. \`~strike~\`도 사용 가능
 - \`inline code\`
 - \`\`\`코드 블록\`\`\` (fenced, 언어 태그 불필요)
 - \> 인용 (line 첫 글자)
