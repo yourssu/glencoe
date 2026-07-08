@@ -25,6 +25,8 @@ describe("routeTeam", () => {
     expect(routeTeam("android_go")).toBe("android");
     expect(routeTeam("backend_go")).toBe("backend");
     expect(routeTeam("frontend_go")).toBe("frontend");
+    expect(routeTeam("back_go")).toBe("backend");
+    expect(routeTeam("front_go")).toBe("frontend");
     expect(routeTeam("ios_go")).toBe("ios");
     expect(routeTeam("hr_go")).toBe("hr");
     expect(routeTeam("legal_go")).toBe("legal");

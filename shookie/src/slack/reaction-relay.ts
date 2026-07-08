@@ -25,7 +25,9 @@ const RELAY_BATCH_DELAY_MS = 250;
 export function routeTeam(reaction: string): TeamKey | null {
   if (!reaction.endsWith("_go")) return null;
   const key = reaction.slice(0, -3);
-  return ROUTABLE_KEYS.has(key) ? (key as TeamKey) : null;
+  const aliasMap: Record<string, TeamKey> = { back: "backend", front: "frontend" };
+  const resolved = aliasMap[key] ?? key;
+  return ROUTABLE_KEYS.has(resolved) ? (resolved as TeamKey) : null;
 }
 
 function delay(ms: number): Promise<void> {
