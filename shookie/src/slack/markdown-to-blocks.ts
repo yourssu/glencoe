@@ -332,11 +332,13 @@ function enforceBlockLimit(blocks: ShookieBlock[]): ShookieBlock[] {
 }
 
 function buildFallbackText(responseText: string, debugFooter: string): string {
-  let text = responseText
+  const stripped = responseText
     .replace(/^#{1,3}\s+/gm, "")
     .replace(/^---+\s*$/gm, "")
     .replace(/^\|[-:|\s]+\|$/gm, "");
-  return text + "\n" + debugFooter;
+  // Fallback text는 알림/미리보기/검색 등에서 노출되므로 mrkdwn 정규화 필수.
+  // 정규화하지 않으면 **bold**, *<URL*> 등이 그대로 노출됨.
+  return toSlackMrkdwn(stripped) + "\n" + debugFooter;
 }
 
 function stripMarkdownBold(text: string): string {
@@ -356,7 +358,8 @@ function toSlackMrkdwn(text: string): string {
       return part
         .replace(/\*\*(.+?)\*\*/g, "*$1*") // **bold** → *bold*
         .replace(/__(.+?)__/g, "*$1*")      // __bold__ → *bold* (Slack has no underline)
-        .replace(/~~(.+?)~~/g, "~$1~");     // ~~strike~~ → ~strike~
+        .replace(/~~(.+?)~~/g, "~$1~")      // ~~strike~~ → ~strike~
+        .replace(/\*<([^>]*?)\*>/g, "*<$1>*"); // *<URL*> → *<URL>* (닫는 asterisk를 > 바깥으로)
     })
     .join("");
 }
