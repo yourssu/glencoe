@@ -221,6 +221,43 @@ describe("convertMarkdownToBlocks", () => {
     }
   });
 
+  it("converts *<URL*> to *<URL>* (닫는 asterisk를 > 바깥으로)", () => {
+    const markdown = "*<https://github.com/yourssu/shookie/pull/46*>";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    expect(section).toBeDefined();
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toBe("*<https://github.com/yourssu/shookie/pull/46>*");
+      expect(text.text).not.toContain("pull/46*>");
+    }
+  });
+
+  it("preserves already-correct *<URL>* format", () => {
+    const markdown = "*<https://github.com/yourssu/shookie/pull/46>*";
+    const { blocks } = convertMarkdownToBlocks(markdown, "footer");
+    const section = blocks.find((b) => b.type === "section");
+    expect(section).toBeDefined();
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toBe("*<https://github.com/yourssu/shookie/pull/46>*");
+    }
+  });
+
+  it("fallback text도 **bold**를 *bold*로 정규화", () => {
+    const markdown = "**제목**: feat: 팀 릴레이 슬랙봇 기능 추가";
+    const { fallbackText } = convertMarkdownToBlocks(markdown, "footer");
+    expect(fallbackText).toContain("*제목*");
+    expect(fallbackText).not.toContain("**제목**");
+  });
+
+  it("fallback text도 *<URL*>을 *<URL>*로 정규화", () => {
+    const markdown = "*<https://github.com/yourssu/shookie/pull/46*>";
+    const { fallbackText } = convertMarkdownToBlocks(markdown, "footer");
+    expect(fallbackText).toContain("*<https://github.com/yourssu/shookie/pull/46>*");
+    expect(fallbackText).not.toContain("pull/46*>");
+  });
+
   it("splits long code blocks into multiple sections with balanced ``` fences", () => {
     const longLine = "x".repeat(2000);
     const markdown = "```\n" + longLine + "\n" + longLine + "\n```";
