@@ -145,7 +145,6 @@ export function registerReactionRelay(app: App): void {
       if (!item || item.type !== "message" || !item.channel || !item.ts) return;
 
       if (event.user === botUserId) return;
-      if (event.item_user === botUserId) return;
 
       const teamKey = routeTeam(event.reaction);
       if (!teamKey) return;
