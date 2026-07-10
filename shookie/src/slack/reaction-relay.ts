@@ -1,7 +1,7 @@
 import type { App } from "@slack/bolt";
 import { logger } from "../logger.js";
 
-export type TeamKey = "pm" | "design" | "android" | "backend" | "frontend" | "ios" | "hr" | "legal" | "marketing" | "all" | "test";
+export type TeamKey = "pm" | "design" | "android" | "backend" | "frontend" | "ios" | "hr" | "legal" | "marketing" | "all" | "general";
 
 const ALL_TEAMS: TeamKey[] = ["pm", "design", "android", "backend", "frontend", "ios", "hr", "legal", "marketing"];
 
@@ -15,10 +15,10 @@ const TEAM_CHANNELS: Partial<Record<TeamKey, string>> = {
   hr: "C9SKN0VRP",
   legal: "C02HKM30AMC",
   marketing: "CPCDPFSCS",
-  test: "C0ATVRN2KA6",
+  general: "C2SPUPV9R",
 };
 
-const ROUTABLE_KEYS: ReadonlySet<string> = new Set<string>([...ALL_TEAMS, "all", "test"]);
+const ROUTABLE_KEYS: ReadonlySet<string> = new Set<string>([...ALL_TEAMS, "all", "general"]);
 
 const RELAY_BATCH_DELAY_MS = 250;
 
