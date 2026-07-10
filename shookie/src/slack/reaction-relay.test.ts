@@ -32,7 +32,7 @@ describe("routeTeam", () => {
     expect(routeTeam("legal_go")).toBe("legal");
     expect(routeTeam("marketing_go")).toBe("marketing");
     expect(routeTeam("all_go")).toBe("all");
-    expect(routeTeam("test_go")).toBe("test");
+    expect(routeTeam("general_go")).toBe("general");
   });
 
   it("릴레이 대상이 아닌 리액션은 null을 반환한다", () => {
