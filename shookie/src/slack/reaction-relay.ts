@@ -149,6 +149,29 @@ export function registerReactionRelay(app: App): void {
       const teamKey = routeTeam(event.reaction);
       if (!teamKey) return;
 
+      // 이미 동일한 이모지 반응이 존재하면 중복 포워딩을 방지
+      try {
+        const res = await client.reactions.get({
+          channel: item.channel,
+          timestamp: item.ts,
+        });
+        const msg = res?.message as Record<string, unknown> | undefined;
+        const reactions = msg?.reactions as Array<{ name: string; count: number }> | undefined;
+        const existing = reactions?.find((r) => r.name === event.reaction);
+        if (existing && existing.count > 1) {
+          logger.info("relay skipped - reaction already exists", {
+            reaction: event.reaction,
+            channel: item.channel,
+            ts: item.ts,
+          });
+          return;
+        }
+      } catch (e) {
+        logger.warn("reactions.get 실패 — 포워딩 진행", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+
       const permalink = await buildPermalink(client, item.channel, item.ts);
       if (!permalink) return;
 
