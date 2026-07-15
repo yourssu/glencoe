@@ -359,7 +359,11 @@ function toSlackMrkdwn(text: string): string {
         .replace(/\*\*(.+?)\*\*/gs, "*$1*") // **bold** → *bold*
         .replace(/__(.+?)__/gs, "*$1*")      // __bold__ → *bold* (Slack has no underline)
         .replace(/~~(.+?)~~/gs, "~$1~")      // ~~strike~~ → ~strike~
-        .replace(/\*<([^>]*?)\*>/gs, "*<$1>*"); // *<URL*> → *<URL>* (닫는 asterisk를 > 바깥으로)
+        .replace(/\*<([^>]*?)\*>/gs, "*<$1>*") // *<URL*> → *<URL>* (닫는 asterisk를 > 바깥으로)
+        // CJK 문자는 \w(word character)에 포함되지 않아 Slack mrkdwn 파서가 *bold* 경계를 인식하지 못한다.
+        // 닫는 * 바로 뒤에 CJK 문자가 붙은 경우 공백을 삽입하여 bold 렌더링이 깨지지 않도록 보정한다.
+        // 예: *3위*야 → *3위* 야
+        .replace(/\*([^*]+)\*([\u1100-\u11FF\u2E80-\u9FFF\uAC00-\uD7AF\u3040-\u30FF])/g, "*$1* $2");
     })
     .join("");
 }

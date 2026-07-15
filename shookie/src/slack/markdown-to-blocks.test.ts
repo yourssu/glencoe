@@ -251,6 +251,36 @@ describe("convertMarkdownToBlocks", () => {
     expect(fallbackText).not.toContain("**제목**");
   });
 
+  it("닫는 * 뒤에 CJK 문자가 붙으면 공백을 삽입한다", () => {
+    const { blocks } = convertMarkdownToBlocks("**3위**야 드디어!", "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toContain("*3위* 야");
+      expect(text.text).not.toContain("*3위*야");
+    }
+  });
+
+  it("닫는 * 뒤에 CJK(한글)가 붙으면 공백을 삽입한다", () => {
+    const { blocks } = convertMarkdownToBlocks("**안녕**하세요 반갑습니다", "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      expect(text.text).toContain("*안녕* 하세요");
+    }
+  });
+
+  it("닫는 * 뒤에 영문/숫자가 오면 공백을 삽입하지 않는다 (기존 동작 유지)", () => {
+    const { blocks } = convertMarkdownToBlocks("**bold**and **count**3개", "footer");
+    const section = blocks.find((b) => b.type === "section");
+    if (section && section.type === "section" && "text" in section) {
+      const text = section.text as { type: string; text: string };
+      // 영문/숫자는 CJK가 아니므로 공백이 삽입되지 않음
+      expect(text.text).toContain("*bold*and");
+      expect(text.text).toContain("*count*3개");
+    }
+  });
+
   it("fallback text도 *<URL*>을 *<URL>*로 정규화", () => {
     const markdown = "*<https://github.com/yourssu/shookie/pull/46*>";
     const { fallbackText } = convertMarkdownToBlocks(markdown, "footer");
