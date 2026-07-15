@@ -356,10 +356,10 @@ function toSlackMrkdwn(text: string): string {
       const isInlineCode = part.length >= 2 && part.startsWith("`") && part.endsWith("`");
       if (isInlineCode) return part;
       return part
-        .replace(/\*\*(.+?)\*\*/g, "*$1*") // **bold** → *bold*
-        .replace(/__(.+?)__/g, "*$1*")      // __bold__ → *bold* (Slack has no underline)
-        .replace(/~~(.+?)~~/g, "~$1~")      // ~~strike~~ → ~strike~
-        .replace(/\*<([^>]*?)\*>/g, "*<$1>*"); // *<URL*> → *<URL>* (닫는 asterisk를 > 바깥으로)
+        .replace(/\*\*(.+?)\*\*/gs, "*$1*") // **bold** → *bold*
+        .replace(/__(.+?)__/gs, "*$1*")      // __bold__ → *bold* (Slack has no underline)
+        .replace(/~~(.+?)~~/gs, "~$1~")      // ~~strike~~ → ~strike~
+        .replace(/\*<([^>]*?)\*>/gs, "*<$1>*"); // *<URL*> → *<URL>* (닫는 asterisk를 > 바깥으로)
     })
     .join("");
 }

@@ -116,14 +116,14 @@ export function buildMainShookieInstructions(): string {
 
 ---
 
-# 8. 응답 포맷 (Slack mrkdwn)
+# 8. 응답 포맷
 
-Slack 메시지로 바로 렌더링되는 마크다운만 사용한다. **표준 마크다운 이중 기호는 절대 금지** (Slack에서 그대로 노출됨).
+표준 마크다운을 자유롭게 사용할 것. Slack 전송 시 \`toSlackMrkdwn\`이 자동으로 변환하므로, 이중 기호(**) 등도 걱정 없이 사용한다.
 
-## 허용되는 인라인 포맷 (이것만 사용)
-- *bold* — single asterisk only. \`**bold**\` 절대 금지
-- _italic_ — single underscore. \`__text__\` 절대 금지
-- ~strike~ — single tilde. \`~~strike~~\` 절대 금지
+## 인라인 포맷
+- **bold** — double asterisk 사용. Slack 전송 시 toSlackMrkdwn이 *bold*로 변환
+- *italic* 또는 _italic_ — single asterisk/underscore 사용
+- ~strike~ — single tilde 사용
 - \`inline code\`
 - \`\`\`코드 블록\`\`\` (fenced, 언어 태그 불필요)
 - \> 인용 (line 첫 글자)
