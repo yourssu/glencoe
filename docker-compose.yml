@@ -20,6 +20,8 @@ services:
       - ./database/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
       - ./database/migrations/002_add_sessions_and_invocations.sql:/docker-entrypoint-initdb.d/002_add_sessions_and_invocations.sql
       - ./database/migrations/003_backfill_session_titles.sql:/docker-entrypoint-initdb.d/003_backfill_session_titles.sql
+      - ./database/migrations/004_add_slack_user_oauth.sql:/docker-entrypoint-initdb.d/004_add_slack_user_oauth.sql
+      - ./database/migrations/005_harden_slack_user_oauth.sql:/docker-entrypoint-initdb.d/005_harden_slack_user_oauth.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -35,9 +37,19 @@ services:
         condition: service_healthy
     restart: always
     logging: *default-logging
+    ports:
+      - "127.0.0.1:${SLACK_USER_OAUTH_PORT:-3000}:${SLACK_USER_OAUTH_PORT:-3000}"
     environment:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       SLACK_APP_TOKEN: ${SLACK_APP_TOKEN}
+      SLACK_USER_OAUTH_ENABLED: ${SLACK_USER_OAUTH_ENABLED:-false}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+      SLACK_OAUTH_REDIRECT_URI: ${SLACK_OAUTH_REDIRECT_URI:-}
+      SLACK_TOKEN_ENCRYPTION_KEY: ${SLACK_TOKEN_ENCRYPTION_KEY:-}
+      SLACK_TOKEN_ROTATION_ENABLED: ${SLACK_TOKEN_ROTATION_ENABLED:-false}
+      SLACK_USER_OAUTH_PORT: ${SLACK_USER_OAUTH_PORT:-3000}
+      SLACK_OAUTH_STATE_TTL_SECONDS: ${SLACK_OAUTH_STATE_TTL_SECONDS:-600}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_MODEL: ${LLM_MODEL:-deepseek-v4-pro}
