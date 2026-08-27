@@ -171,6 +171,8 @@ yarn workspace shookie test
 
 채널 메시지를 수신하고 OAuth 후 대기 메시지를 다시 읽으려면 Slack 앱에 공개/비공개 채널의 message event 구독과 해당 history scope가 필요합니다. 실제 Slack Redirect URL, 앱 scope/event 설정, 메시지 편집 정책과 알림 동작 검증은 자격증명이 있는 배포 환경에서 진행해야 합니다.
 
+Slack 앱 설정, 비밀값 분류, 로컬/수동 E2E, 기존 mention-bot 전환 및 롤백 절차는 [`docs/slack-mention-groups-rollout.md`](docs/slack-mention-groups-rollout.md)를 따르세요. 특히 두 봇을 같은 채널에서 동시에 활성화하지 말고, 편집으로 추가된 멘션의 실제 알림 여부를 실워크스페이스에서 승인하기 전에는 운영 전환하지 않습니다.
+
 ## 기술 스택
 
 - **TypeScript ESM** (Node.js 20+) + @slack/bolt (Socket Mode)
