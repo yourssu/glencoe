@@ -15,6 +15,7 @@ describe("logger secret redaction", () => {
       `request failed: Bearer ${token} https://example.com/callback?code=oauth-code&state=oauth-state`,
       {
         accessToken: token,
+        radarInternalApiKey: "radar-internal-secret",
         nested: { refresh_token: "xoxe-1-refresh-secret", scopes: ["chat:write"] },
       },
     );
@@ -24,6 +25,7 @@ describe("logger secret redaction", () => {
     expect(output).not.toContain("oauth-code");
     expect(output).not.toContain("oauth-state");
     expect(output).not.toContain("xoxe-1-refresh-secret");
+    expect(output).not.toContain("radar-internal-secret");
     expect(output).toContain("[REDACTED]");
     expect(output).toContain("chat:write");
   });

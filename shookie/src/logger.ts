@@ -44,7 +44,9 @@ function isSecretKey(key: string): boolean {
     normalized.endsWith("accesstoken") ||
     normalized.endsWith("refreshtoken") ||
     normalized.endsWith("clientsecret") ||
-    normalized.endsWith("encryptionkey")
+    normalized.endsWith("encryptionkey") ||
+    normalized.endsWith("apikey") ||
+    normalized.endsWith("internalkey")
   );
 }
 

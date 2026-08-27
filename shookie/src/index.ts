@@ -1,5 +1,9 @@
 import { App } from "@slack/bolt";
-import { config, getSlackUserOAuthConfig } from "./config.js";
+import {
+  config,
+  getMentionGroupReplacementConfig,
+  getSlackUserOAuthConfig,
+} from "./config.js";
 import { setLogLevel, logger } from "./logger.js";
 import { createAgent } from "./agent/index.js";
 import { registerHandlers } from "./slack/handlers.js";
@@ -7,6 +11,11 @@ import { registerAssistantHandlers } from "./slack/assistant.js";
 import { registerReactionRelay } from "./slack/reaction-relay.js";
 import { closePool, runMigrations } from "database";
 import { createSlackUserOAuthController } from "./slack/user-oauth/index.js";
+import type { ConsumedSlackOAuthState } from "./slack/user-oauth/state-service.js";
+import {
+  createMentionGroupReplacementService,
+  registerMentionGroupReplacement,
+} from "./slack/mention-groups/index.js";
 
 async function main() {
   // 1. 로깅 설정
@@ -15,14 +24,25 @@ async function main() {
 
   // 2. 사용자 OAuth 초기화 (멘션 그룹 원문 치환용)
   const userOAuthConfig = getSlackUserOAuthConfig();
+  const mentionGroupConfig = getMentionGroupReplacementConfig();
   if (userOAuthConfig) {
     const appliedMigrations = await runMigrations();
     if (appliedMigrations.length > 0) {
       logger.info("DB 마이그레이션 완료", { appliedMigrations });
     }
   }
+  let resumePendingMention: ((state: ConsumedSlackOAuthState) => Promise<void>) | null = null;
   const userOAuth = userOAuthConfig
-    ? createSlackUserOAuthController(userOAuthConfig)
+    ? createSlackUserOAuthController(userOAuthConfig, mentionGroupConfig
+      ? {
+          onAuthorized: async (state) => {
+            if (!resumePendingMention) {
+              throw new Error("Mention group replacement is not ready");
+            }
+            await resumePendingMention(state);
+          },
+        }
+      : {})
     : null;
 
   // 3. 에이전트 생성
@@ -48,6 +68,17 @@ async function main() {
   });
 
   // 5. 핸들러 등록
+  if (mentionGroupConfig && userOAuth) {
+    const mentionGroupReplacement = createMentionGroupReplacementService(
+      app,
+      userOAuth,
+      mentionGroupConfig,
+    );
+    resumePendingMention = (state) =>
+      mentionGroupReplacement.resumeAfterAuthorization(state);
+    registerMentionGroupReplacement(app, mentionGroupReplacement);
+    logger.info("Slack 멘션 그룹 원문 치환 활성화");
+  }
   registerHandlers(app, agent);
   registerAssistantHandlers(app);
   registerReactionRelay(app);

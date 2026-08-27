@@ -165,6 +165,12 @@ yarn workspace shookie test
 | `GITHUB` | GitHub Personal Access Token |
 | `POSTGRES_PASSWORD` | PostgreSQL 비밀번호 |
 
+### Radar 멘션 그룹 원문 치환
+
+이 기능은 기본적으로 꺼져 있으며 `SLACK_MENTION_GROUP_REPLACEMENT_ENABLED=true`일 때만 동작합니다. 작성자 User OAuth에는 `chat:write`만 사용하고, Radar 조회는 `RADAR_MENTION_GROUPS_API_URL`의 `/internal/v1/mention-groups`와 전용 `SHOOKIE_MENTION_GROUPS_API_KEY`를 사용합니다. 상세 환경변수와 안전한 기본값은 `.env.example`을 참고하세요.
+
+채널 메시지를 수신하고 OAuth 후 대기 메시지를 다시 읽으려면 Slack 앱에 공개/비공개 채널의 message event 구독과 해당 history scope가 필요합니다. 실제 Slack Redirect URL, 앱 scope/event 설정, 메시지 편집 정책과 알림 동작 검증은 자격증명이 있는 배포 환경에서 진행해야 합니다.
+
 ## 기술 스택
 
 - **TypeScript ESM** (Node.js 20+) + @slack/bolt (Socket Mode)
