@@ -491,4 +491,35 @@ describe("SlackUserTokenService", () => {
     });
     expect(repository.record).toBeNull();
   });
+
+  it("chat.update가 사용한 토큰과 같은 DB 버전만 조건부 폐기한다", async () => {
+    const repository = new MemoryTokenRepository();
+    const revokeToken = vi.fn().mockResolvedValue(undefined);
+    const service = new SlackUserTokenService(
+      cipher,
+      oauthClient({ revokeToken }),
+      false,
+      repository,
+    );
+    await service.saveGrant({
+      teamId: "T123",
+      userId: "U123",
+      accessToken: "xoxp-current",
+      refreshToken: null,
+      expiresInSeconds: null,
+      scopes: ["chat:write"],
+    });
+
+    await expect(
+      service.invalidateAccessToken("T123", "U123", "xoxp-stale"),
+    ).resolves.toBe(false);
+    expect(repository.record).not.toBeNull();
+    expect(revokeToken).not.toHaveBeenCalled();
+
+    await expect(
+      service.invalidateAccessToken("T123", "U123", "xoxp-current"),
+    ).resolves.toBe(true);
+    expect(repository.record).toBeNull();
+    expect(revokeToken).toHaveBeenCalledWith("xoxp-current");
+  });
 });

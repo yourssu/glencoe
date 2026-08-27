@@ -7,6 +7,7 @@ import {
   type SaveSlackUserOAuthToken,
   type SlackUserOAuthTokenRecord,
 } from "database";
+import { timingSafeEqual } from "node:crypto";
 import { logger } from "../../logger.js";
 import { TokenCipher } from "../../security/token-cipher.js";
 import {
@@ -230,6 +231,41 @@ export class SlackUserTokenService {
     return true;
   }
 
+  /**
+   * Invalidates only the credential that a failed Slack call actually used.
+   * A concurrent OAuth callback or rotation must not be revoked because an
+   * older in-flight chat.update received a terminal authentication error.
+   */
+  async invalidateAccessToken(
+    teamId: string,
+    userId: string,
+    expectedAccessToken: string,
+  ): Promise<boolean> {
+    const record = await this.repository.get(teamId, userId);
+    if (!record) return false;
+    const currentAccessToken = this.decrypt(record, "access");
+    if (!tokensEqual(currentAccessToken, expectedAccessToken)) return false;
+
+    const invalidated = await this.repository.revokeIfUnchanged(
+      teamId,
+      userId,
+      record.encryptedAccessToken,
+      record.encryptedRefreshToken,
+    );
+    if (!invalidated) return false;
+
+    try {
+      await this.oauthClient.revokeToken(expectedAccessToken);
+    } catch (error) {
+      if (!isTerminalTokenError(error)) {
+        logger.warn("Slack API 실패 토큰 원격 폐기 실패", {
+          error: error instanceof SlackOAuthApiError ? error.code : errorName(error),
+        });
+      }
+    }
+    return true;
+  }
+
   private async runRefresh(
     record: SlackUserOAuthTokenRecord,
     force = false,
@@ -358,4 +394,10 @@ function isTerminalTokenError(error: unknown): boolean {
 
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : "unknown_error";
+}
+
+function tokensEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left, "utf8");
+  const rightBytes = Buffer.from(right, "utf8");
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
