@@ -50,7 +50,7 @@ describe("mention group parser", () => {
     ]);
   });
 
-  it("복수 그룹과 별칭의 멤버 합집합을 원문 순서대로 한 번씩 치환한다", () => {
+  it("입력한 그룹 표기를 코드 라벨로 남기고 멤버 합집합을 한 번씩 치환한다", () => {
     const platform: ActiveMentionGroup = {
       id: "4d92a1d8-52f4-46b0-b389-3284cff8a688",
       handle: "platform",
@@ -63,7 +63,9 @@ describe("mention group parser", () => {
       catalog([backend, platform]),
     );
 
-    expect(result.text).toBe("검토: <@U111> <@U222>, <@U333> 그리고 ");
+    expect(result.text).toBe(
+      "검토: `@be`(<@U111> <@U222> ), `@platform`(<@U333> ) 그리고 `@backend`",
+    );
     expect(result.memberUserIds).toEqual(["U111", "U222", "U333"]);
     expect(result.groupHandles).toEqual(["backend", "platform"]);
     expect(result.matchedOccurrenceCount).toBe(3);
@@ -82,8 +84,14 @@ describe("mention group parser", () => {
       catalog([empty, backend]),
     );
 
-    expect(result.text).toBe("@unknown @empty <@U111> <@U222>");
+    expect(result.text).toBe("@unknown @empty `@backend`(<@U111> <@U222> )");
     expect(result.unknownHandles).toEqual(["unknown"]);
     expect(result.emptyGroupHandles).toEqual(["empty"]);
+  });
+
+  it("대문자로 입력해도 소문자 그룹을 호출하고 라벨도 소문자로 정규화한다", () => {
+    const result = createMentionReplacementPlan("확인 @Backend", catalog([backend]));
+
+    expect(result.text).toBe("확인 `@backend`(<@U111> <@U222> )");
   });
 });

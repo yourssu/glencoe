@@ -76,7 +76,7 @@ describe("MentionGroupReplacementService", () => {
       accessToken: "xoxp-author",
       channelId: "C123",
       messageTs: "123.456",
-      text: "검토 부탁해요 <@U111> <@U222>",
+      text: "검토 부탁해요 `@backend`(<@U111> <@U222> )",
     });
     expect(deps.oauth.createAuthorizationUrl).not.toHaveBeenCalled();
   });
