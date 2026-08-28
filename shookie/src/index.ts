@@ -1,37 +1,62 @@
 import { App } from "@slack/bolt";
-import { config } from "./config.js";
+import { config, getSlackUserOAuthConfig } from "./config.js";
 import { setLogLevel, logger } from "./logger.js";
 import { createAgent } from "./agent/index.js";
 import { registerHandlers } from "./slack/handlers.js";
 import { registerAssistantHandlers } from "./slack/assistant.js";
 import { registerReactionRelay } from "./slack/reaction-relay.js";
-import { closePool } from "database";
+import { closePool, runMigrations } from "database";
+import { createSlackUserOAuthController } from "./slack/user-oauth/index.js";
 
 async function main() {
   // 1. 로깅 설정
   setLogLevel(config.LOG_LEVEL);
   logger.info("구성 로드 완료");
 
-  // 2. 에이전트 생성
+  // 2. 사용자 OAuth 초기화 (멘션 그룹 원문 치환용)
+  const userOAuthConfig = getSlackUserOAuthConfig();
+  if (userOAuthConfig) {
+    const appliedMigrations = await runMigrations();
+    if (appliedMigrations.length > 0) {
+      logger.info("DB 마이그레이션 완료", { appliedMigrations });
+    }
+  }
+  const userOAuth = userOAuthConfig
+    ? createSlackUserOAuthController(userOAuthConfig)
+    : null;
+
+  // 3. 에이전트 생성
   const agent = createAgent();
 
-  // 3. Slack 앱 초기화
+  // 4. Slack 앱 초기화
   const app = new App({
     token: config.SLACK_BOT_TOKEN,
     socketMode: true,
     appToken: config.SLACK_APP_TOKEN,
+    ...(userOAuth && userOAuthConfig
+      ? {
+          customRoutes: [
+            {
+              path: userOAuth.callbackPath,
+              method: "GET",
+              handler: userOAuth.handleCallback,
+            },
+          ],
+          installerOptions: { port: userOAuthConfig.port },
+        }
+      : {}),
   });
 
-  // 4. 핸들러 등록
+  // 5. 핸들러 등록
   registerHandlers(app, agent);
   registerAssistantHandlers(app);
   registerReactionRelay(app);
 
-  // 5. 시작
+  // 6. 시작
   await app.start();
   logger.info("슈키가 시작되었습니다! 🚀");
 
-  // 6. 종료 시 DB 연결 정리
+  // 7. 종료 시 DB 연결 정리
   const shutdown = async () => {
     logger.info("종료 중...");
     await closePool();
@@ -42,6 +67,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("부팅 실패:", err);
+  logger.error("부팅 실패", err);
   process.exit(1);
 });

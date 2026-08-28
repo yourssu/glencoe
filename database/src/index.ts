@@ -1,4 +1,5 @@
 export { getPool, closePool } from "./pool.js";
+export { runMigrations } from "./migrate.js";
 export {
   logAgentCall,
   upsertSession,
@@ -18,3 +19,19 @@ export {
   type InvocationCompletion,
   type ToolCallRecord,
 } from "./log-invocation.js";
+export {
+  saveSlackUserOAuthToken,
+  getSlackUserOAuthToken,
+  replaceRotatedSlackUserOAuthToken,
+  revokeSlackUserOAuthToken,
+  revokeSlackUserOAuthTokenIfUnchanged,
+  deleteSlackUserOAuthToken,
+  type SlackUserOAuthTokenRecord,
+  type SaveSlackUserOAuthToken,
+} from "./slack-user-oauth.js";
+export {
+  createSlackOAuthState,
+  consumeSlackOAuthState,
+  deleteExpiredSlackOAuthStates,
+  type SlackOAuthStateRecord,
+} from "./slack-oauth-state.js";
