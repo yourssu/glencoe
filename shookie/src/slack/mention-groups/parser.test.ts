@@ -64,7 +64,7 @@ describe("mention group parser", () => {
     );
 
     expect(result.text).toBe(
-      "검토: `@be`(<@U111> <@U222> ), `@platform`(<@U333> ) 그리고 `@backend`",
+      "검토: `@be`(<@U111> <@U222>), `@platform`(<@U333>) 그리고 `@backend`",
     );
     expect(result.memberUserIds).toEqual(["U111", "U222", "U333"]);
     expect(result.groupHandles).toEqual(["backend", "platform"]);
@@ -84,7 +84,7 @@ describe("mention group parser", () => {
       catalog([empty, backend]),
     );
 
-    expect(result.text).toBe("@unknown @empty `@backend`(<@U111> <@U222> )");
+    expect(result.text).toBe("@unknown @empty `@backend`(<@U111> <@U222>)");
     expect(result.unknownHandles).toEqual(["unknown"]);
     expect(result.emptyGroupHandles).toEqual(["empty"]);
   });
@@ -92,6 +92,6 @@ describe("mention group parser", () => {
   it("대문자로 입력해도 소문자 그룹을 호출하고 라벨도 소문자로 정규화한다", () => {
     const result = createMentionReplacementPlan("확인 @Backend", catalog([backend]));
 
-    expect(result.text).toBe("확인 `@backend`(<@U111> <@U222> )");
+    expect(result.text).toBe("확인 `@backend`(<@U111> <@U222>)");
   });
 });

@@ -195,7 +195,7 @@ describe("mention group local contract E2E", () => {
 
     expect(slack.messages.get("C123:100.001")).toMatchObject({
       userId: "U900",
-      text: "배포 `@be`(<@U111> <@U222> ) + `@platform`(<@U333> ) + @disabled",
+      text: "배포 `@be`(<@U111> <@U222>) + `@platform`(<@U333>) + @disabled",
     });
     expect(slack.updates[0]).toMatchObject({
       accessToken: "xoxp-channel-author",
@@ -225,7 +225,7 @@ describe("mention group local contract E2E", () => {
     );
     expect(slack.messages.get("G123:101.002")).toMatchObject({
       userId: "U901",
-      text: "스레드 `@backend`(<@U111> <@U222> )",
+      text: "스레드 `@backend`(<@U111> <@U222>)",
     });
     expect(slack.updates[1]).toMatchObject({
       accessToken: "xoxp-thread-author",
@@ -259,7 +259,7 @@ describe("mention group local contract E2E", () => {
       }),
     );
 
-    expect(slack.messages.get("C123:102.003")?.text).toBe("변경 `@be`(<@U444> )");
+    expect(slack.messages.get("C123:102.003")?.text).toBe("변경 `@be`(<@U444>)");
     expect(radarServer.requests).toEqual([
       { internalKey: INTERNAL_KEY, ifNoneMatch: undefined },
       { internalKey: INTERNAL_KEY, ifNoneMatch: '"mention-groups-1"' },
@@ -324,7 +324,7 @@ describe("mention group local contract E2E", () => {
     });
     expect(slack.messages.get("G123:200.002")).toMatchObject({
       userId: "U902",
-      text: "최초 인증 `@be`(<@U111> )",
+      text: "최초 인증 `@be`(<@U111>)",
     });
 
     slack.putMessage({
@@ -361,7 +361,7 @@ describe("mention group local contract E2E", () => {
     });
     expect(slack.messages.get("C123:201.003")).toMatchObject({
       userId: "U902",
-      text: "폐기 복구 `@backend`(<@U111> )",
+      text: "폐기 복구 `@backend`(<@U111>)",
     });
     expect(slack.updates.at(-1)?.accessToken).toBe("xoxp-reauthorized");
   });
