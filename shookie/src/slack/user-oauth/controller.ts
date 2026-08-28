@@ -71,6 +71,14 @@ export class SlackUserOAuthController {
     return this.tokenService.revoke(teamId, userId);
   }
 
+  async invalidateAccessToken(
+    teamId: string,
+    userId: string,
+    expectedAccessToken: string,
+  ): Promise<boolean> {
+    return this.tokenService.invalidateAccessToken(teamId, userId, expectedAccessToken);
+  }
+
   handleCallback = (req: IncomingMessage, res: ServerResponse): void => {
     void this.processCallback(req, res).catch((error: unknown) => {
       const safeError = error instanceof SlackOAuthApiError ? error.code : errorName(error);
