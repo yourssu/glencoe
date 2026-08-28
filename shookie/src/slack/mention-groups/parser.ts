@@ -90,7 +90,7 @@ export function createMentionReplacementPlan(
     replacements.push({
       ...occurrence,
       replacement: memberMentions.length > 0
-        ? `\`@${occurrence.handle}\`(${memberMentions} )`
+        ? `\`@${occurrence.handle}\`(${memberMentions})`
         : `\`@${occurrence.handle}\``,
     });
   }
