@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "yourssu/mention-bot",
+    "commit": "15e14b50084ea49f44ea87c04f12460b51892b46",
+    "frozenAt": "2026-08-28T00:00:00Z"
+  },
+  "groups": [
+    {
+      "handle": "be",
+      "displayName": "Backend active",
+      "description": "Example only; replace with the frozen runtime-resolved Slack IDs",
+      "aliases": [],
+      "memberUserIds": ["U0123456789"],
+      "active": true
+    },
+    {
+      "handle": "release-captains",
+      "displayName": "Release captains",
+      "description": "Example custom group",
+      "aliases": ["release"],
+      "memberUserIds": ["U0123456789", "U9876543210"],
+      "active": true
+    }
+  ]
+}
