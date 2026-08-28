@@ -86,9 +86,12 @@ export function createMentionReplacementPlan(
       seenMembers.add(memberId);
       return true;
     });
+    const memberMentions = freshMembers.map((memberId) => `<@${memberId}>`).join(" ");
     replacements.push({
       ...occurrence,
-      replacement: freshMembers.map((memberId) => `<@${memberId}>`).join(" "),
+      replacement: memberMentions.length > 0
+        ? `\`@${occurrence.handle}\`(${memberMentions} )`
+        : `\`@${occurrence.handle}\``,
     });
   }
 
