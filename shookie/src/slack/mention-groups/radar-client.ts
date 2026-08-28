@@ -132,7 +132,7 @@ export class RadarMentionGroupsClient {
     try {
       if (response.status === 304) {
         if (!this.cached) throw new RadarMentionGroupsError("unexpected_not_modified");
-        if (response.headers.get("etag") !== this.cached.catalog.etag) {
+        if (!isEquivalentEntityTag(response.headers.get("etag"), this.cached.catalog.etag)) {
           throw new RadarMentionGroupsError("invalid_not_modified_etag");
         }
         this.cached.expiresAt = this.now() + this.options.cacheTtlMs;
@@ -162,7 +162,7 @@ export class RadarMentionGroupsClient {
       if (!parsed.success) throw new RadarMentionGroupsError("invalid_schema");
 
       const expectedEtag = `"mention-groups-${parsed.data.revision}"`;
-      if (response.headers.get("etag") !== expectedEtag) {
+      if (!isEquivalentEntityTag(response.headers.get("etag"), expectedEtag)) {
         throw new RadarMentionGroupsError("invalid_etag");
       }
 
@@ -201,6 +201,10 @@ export class RadarMentionGroupsClient {
       clearTimeout(timeout);
     }
   }
+}
+
+function isEquivalentEntityTag(actual: string | null, expectedStrong: string): boolean {
+  return actual === expectedStrong || actual === `W/${expectedStrong}`;
 }
 
 function catalogFingerprint(groups: ActiveMentionGroup[]): string {

@@ -72,6 +72,48 @@ describe("RadarMentionGroupsClient", () => {
     });
   });
 
+  it("중간 프록시가 동일 revision ETag를 weak 형식으로 바꿔도 허용한다", async () => {
+    let time = 0;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(responseBody), {
+          status: 200,
+          headers: { ETag: 'W/"mention-groups-12"' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 304,
+          headers: { ETag: 'W/"mention-groups-12"' },
+        }),
+      );
+    const radar = client(fetcher, () => time);
+
+    const first = await radar.getCatalog();
+    time = 1_001;
+    const second = await radar.getCatalog();
+
+    expect(first.etag).toBe('"mention-groups-12"');
+    expect(second).toBe(first);
+    expect(fetcher.mock.calls[1]?.[1]?.headers).toMatchObject({
+      "If-None-Match": '"mention-groups-12"',
+    });
+  });
+
+  it("weak ETag라도 body revision과 다르면 거부한다", async () => {
+    const radar = client(
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(responseBody), {
+          status: 200,
+          headers: { ETag: 'W/"mention-groups-13"' },
+        }),
+      ),
+    );
+
+    await expect(radar.getCatalog()).rejects.toMatchObject({ code: "invalid_etag" });
+  });
+
   it("동시 cache miss를 하나의 Radar 요청으로 합친다", async () => {
     let resolveResponse: ((value: Response) => void) | undefined;
     const fetcher = vi.fn().mockReturnValue(
